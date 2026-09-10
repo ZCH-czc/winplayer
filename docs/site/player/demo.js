@@ -15,7 +15,8 @@
   const activeId=()=>chinese()?'dahai-demo':'demo-0';
   const click=id=>document.getElementById(id)?.click();
   function settle(){if(!running)for(const animation of document.getAnimations?.()||[]){if(Number.isFinite(animation.effect?.getTiming().iterations))try{animation.finish();}catch{}}}
-  function playback(){api.setPlaybackState({id:activeId(),isPlaying:chinese()?audioState.playing:running,currentTime:chinese()?audioState.currentTime:time,duration:chinese()?audioState.duration:204,audioInformation:chinese()?{codec:'MP3',bitrateKbps:128,sampleRateHz:44100,channels:2,bitsPerSample:null,isLossless:false,isAverageBitrate:false}:quality});settle();}
+  // Pause this visual projection when hidden or motion-paused; parent audio is independent.
+  function playback(){api.setPlaybackState({id:activeId(),isPlaying:running,currentTime:chinese()?audioState.currentTime:time,duration:chinese()?audioState.duration:204,audioInformation:chinese()?{codec:'MP3',bitrateKbps:128,sampleRateHz:44100,channels:2,bitsPerSample:null,isLossless:false,isAverageBitrate:false}:quality});settle();}
   function loop(){
     if(!running||chinese())return;
     const now=performance.now();time+=(now-last)/1000;last=now;
