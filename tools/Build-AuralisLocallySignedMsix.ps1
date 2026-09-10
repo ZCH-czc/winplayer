@@ -3,7 +3,7 @@
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(\.\d+)?$')]
-    [string]$Version = '0.16.8',
+    [string]$Version = '0.16.9',
 
     [ValidateSet('win-x64')]
     [string]$Runtime = 'win-x64',

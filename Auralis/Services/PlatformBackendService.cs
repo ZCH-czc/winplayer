@@ -213,6 +213,10 @@ public sealed class PlatformBackendService : IAsyncDisposable
                 token.ThrowIfCancellationRequested();
                 budget.Token.ThrowIfCancellationRequested();
                 if (Volatile.Read(ref _disposeStarted) != 0) return null;
+                // The router timeout and shared budget timer can complete in either order.
+                // A timed-out lookup is terminal even if the shared timer has not fired yet;
+                // otherwise a fast fallback can incorrectly turn exhaustion into success.
+                if (result.Error?.Code == PlatformErrorCode.Timeout) return null;
                 if (IsPluginDisabled(registration.PluginId)) continue;
                 if (result.IsSuccess && result.Value is { } lyrics && (lyrics.Instrumental || !string.IsNullOrWhiteSpace(lyrics.Text))) return lyrics;
             }

@@ -9,7 +9,7 @@
   <Identity
     Name="Auralis.Player"
     Publisher="CN=Auralis"
-    Version="0.16.8.0"
+    Version="0.16.9.0"
     ProcessorArchitecture="x64" />
 
   <Properties>

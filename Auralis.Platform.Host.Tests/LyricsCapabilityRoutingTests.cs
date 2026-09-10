@@ -54,6 +54,8 @@ internal static class LyricsCapabilityRoutingTests
         foreach (var title in new[] { "not-found", "empty", "throws" })
             Check((await backend.LookupLyricsAsync(request with { Title = title }, default))?.Source == "lookup.b-fallback", "Failed/empty candidate falls through: " + title);
         Check((await backend.LookupLyricsAsync(request with { Title = "instrumental" }, default)) is { Instrumental: true, Source: "lookup.a-configured" }, "Instrumental is a successful match without text");
+        Check(await backend.LookupLyricsAsync(request with { Title = "route-timeout" }, default) is null,
+            "A routed timeout must not fall through before the overall budget timer fires");
         Check(await backend.LookupLyricsAsync(request with { Title = "hang" }, default, TimeSpan.FromMilliseconds(100)) is null, "Entire lookup budget is bounded");
         using (var cancelled = new CancellationTokenSource(100))
         {
@@ -103,6 +105,9 @@ public sealed class LyricsRoutingProvider(string id) : IPlatformProvider, IPlatf
             if (request.Title == "empty") return PlatformResult<PlatformLyricsLookupResult>.Success(new(id, " "));
             if (request.Title == "throws") throw new InvalidOperationException("Fixture failure");
             if (request.Title == "instrumental") return PlatformResult<PlatformLyricsLookupResult>.Success(new(id, "", true));
+            // Deterministically reproduce the router winning the two-timer race. The outer
+            // budget is still live, but a timeout must not start another lookup candidate.
+            if (request.Title == "route-timeout") return PlatformResult<PlatformLyricsLookupResult>.Failure(PlatformErrorCode.Timeout, "Fixture routed timeout");
             if (request.Title == "hang") await Task.Delay(Timeout.Infinite, token);
             if (request.Title == "delayed")
             {

@@ -15,7 +15,7 @@
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
     <RootNamespace>Auralis</RootNamespace>
     <AssemblyName>Auralis</AssemblyName>
-    <Version>0.16.8</Version>
+    <Version>0.16.9</Version>
     <Product>Auralis</Product>
     <Authors>Auralis</Authors>
     <Description>本地音乐优先、可选在线搜索的 Windows Fluent 播放器</Description>
