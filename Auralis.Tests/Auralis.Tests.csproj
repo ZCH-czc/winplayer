@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NuGetAudit>false</NuGetAudit>
+    <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Auralis.Platform.Host\Auralis.Platform.Host.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Auralis\Services\LyricsParser.cs" Link="LyricsParser.cs" />
+    <Compile Include="..\Auralis\Services\SingleInstanceCoordinator.cs" Link="SingleInstanceCoordinator.cs" />
+    <Compile Include="..\Auralis.Playback.LibVlc\AudioPlaybackStartOptions.cs" Link="AudioPlaybackStartOptions.cs" />
+    <Compile Include="..\Auralis.Playback.LibVlc\FlacAudioInformation.cs" Link="FlacAudioInformation.cs" />
+    <Compile Include="..\Auralis\Services\ClipboardWriteRetry.cs" Link="ClipboardWriteRetry.cs" />
+    <Compile Include="..\Auralis\Services\CommentAvatarRegistry.cs" Link="CommentAvatarRegistry.cs" />
+    <Compile Include="..\Auralis\Services\LyricsService.cs" Link="LyricsService.cs" />
+    <Compile Include="..\Auralis\Services\LocalLyricsLocator.cs" Link="LocalLyricsLocator.cs" />
+    <Compile Include="..\Auralis\Services\AudioMetadataReader.cs" Link="AudioMetadataReader.cs" />
+    <Compile Include="..\Auralis\Services\OnlinePlaybackSourceService.cs" Link="OnlinePlaybackSourceService.cs" />
+    <Compile Include="..\Auralis\Services\MediaTransportServices.cs" Link="MediaTransportServices.cs" />
+    <Compile Include="..\Auralis\Services\DefaultMusicAppRegistrationService.cs" Link="DefaultMusicAppRegistrationService.cs" />
+    <Compile Include="..\Auralis\Services\PackageIdentityService.cs" Link="PackageIdentityService.cs" />
+    <Compile Include="..\Auralis\Services\MusicFolderStore.cs" Link="MusicFolderStore.cs" />
+    <Compile Include="..\Auralis\Services\SavedPlaylistStore.cs" Link="SavedPlaylistStore.cs" />
+    <Compile Include="..\Auralis\Services\SavedTrackMetadata.cs" Link="SavedTrackMetadata.cs" />
+    <Compile Include="..\Auralis\TaskbarWidgetVisibilityPolicy.cs" Link="TaskbarWidgetVisibilityPolicy.cs" />
+    <Compile Include="..\Auralis\TaskbarWidgetUpdateGate.cs" Link="TaskbarWidgetUpdateGate.cs" />
+    <Compile Include="..\Auralis\TaskbarWidgetLease.cs" Link="TaskbarWidgetLease.cs" />
+    <Compile Include="..\Auralis\TaskbarLyricProjection.cs" Link="TaskbarLyricProjection.cs" />
+    <Compile Include="..\Auralis\DesktopLyricsMaskStyle.cs" Link="DesktopLyricsMaskStyle.cs" />
+    <Compile Include="..\Auralis\Services\WindowsAudioEndpointLatencyProbe.cs" Link="WindowsAudioEndpointLatencyProbe.cs" />
+    <Compile Include="..\Auralis\Services\AppLogging.cs" Link="AppLogging.cs" />
+    <Compile Include="..\Auralis\Services\WindowSettingsStore.cs" Link="WindowSettingsStore.cs" />
+    <Compile Include="..\Auralis\Services\LanSharingSettingsStore.cs" Link="LanSharingSettingsStore.cs" />
+    <Compile Include="..\Auralis\Services\LanAddressPolicy.cs" Link="LanAddressPolicy.cs" />
+    <Compile Include="..\Auralis\Services\LanAccessSessionManager.cs" Link="LanAccessSessionManager.cs" />
+    <Compile Include="..\Auralis\Services\LanMusicSharingService.cs" Link="LanMusicSharingService.cs" />
+    <Compile Include="..\Auralis\Localization\NativeText.cs" Link="NativeText.cs" />
+    <Compile Include="..\Auralis\Models\TrackInfo.cs" Link="TrackInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Auralis.Platform.Abstractions\Auralis.Platform.Abstractions.csproj" />
+    <ProjectReference Include="..\Auralis.Playback.Abstractions\Auralis.Playback.Abstractions.csproj" />
+    <ProjectReference Include="..\Auralis.MediaTransport.Http\Auralis.MediaTransport.Http.csproj" />
+    <ProjectReference Include="..\Auralis.MediaTransport.Host\Auralis.MediaTransport.Host.csproj" />
+  </ItemGroup>
+</Project>

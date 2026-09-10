@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Auralis.Platform.Abstractions</RootNamespace>
+    <AssemblyName>Auralis.Platform.Abstractions</AssemblyName>
+    <Version>1.2.0</Version>
+    <!-- Additive API 1 contracts retain the existing assembly identity. -->
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <PackageId>Auralis.Platform.Abstractions</PackageId>
+    <Authors>Auralis</Authors>
+    <Description>Stable, dependency-free contracts for optional Auralis online platform plugins.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

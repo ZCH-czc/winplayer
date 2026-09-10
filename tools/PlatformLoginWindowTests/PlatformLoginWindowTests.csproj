@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Auralis.Platform.Host/Auralis.Platform.Host.csproj" />
+    <Compile Include="../../Auralis/MainWindow.PlatformLogin.cs" Link="MainWindow.PlatformLogin.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Auralis is a WPF/WebView2 host that also references WinForms for NotifyIcon.  Keep the
+         OS-level PerMonitorV2 manifest declaration so DPI awareness is established before the
+         first WPF or WebView2 HWND exists; WFAC010 otherwise assumes a WinForms-only startup. -->
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <RootNamespace>Auralis</RootNamespace>
+    <AssemblyName>Auralis</AssemblyName>
+    <Version>0.16.8</Version>
+    <Product>Auralis</Product>
+    <Authors>Auralis</Authors>
+    <Description>本地音乐优先、可选在线搜索的 Windows Fluent 播放器</Description>
+    <ApplicationIcon>Assets\Auralis.ico</ApplicationIcon>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The opt-in LAN player is hosted by an in-process Kestrel endpoint. Using the shared
+         Windows .NET framework keeps HTTP range handling and shutdown deterministic without
+         introducing a separately downloaded web-server runtime. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Ship the decoder and audio output engine with Auralis. This keeps playback working on
+         Windows N/KN and stripped-down installations that do not provide Media Foundation
+         codecs. LibVLCSharp is LGPL-2.1-or-later; the native VideoLAN package carries its own
+         license notices in the publish output. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The application references only the stable host/contracts. The concrete online-source
+         assembly is an optional runtime plugin and is deliberately excluded from compilation. -->
+    <ProjectReference Include="..\Auralis.Platform.Host\Auralis.Platform.Host.csproj" />
+    <ProjectReference Include="..\Auralis.MediaTransport.Host\Auralis.MediaTransport.Host.csproj" />
+    <ProjectReference Include="..\Auralis.Playback.LibVlc\Auralis.Playback.LibVlc.csproj" />
+    <ProjectReference Include="..\Auralis.Playback.Host\Auralis.Playback.Host.csproj" />
+    <ProjectReference Include="..\Auralis.MediaTransport.Http\Auralis.MediaTransport.Http.csproj" />
+    <ProjectReference Include="..\Auralis.Artwork.Http\Auralis.Artwork.Http.csproj" />
+    <ProjectReference Include="..\Auralis.Artwork.Host\Auralis.Artwork.Host.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\AuralisIcon.png" Link="wwwroot\assets\auralis-icon.png">
+      <TargetPath>wwwroot\assets\auralis-icon.png</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="wwwroot\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\packaging\README-zh-CN.txt" Link="README-zh-CN.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\packaging\THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Auralis.ico" />
+  </ItemGroup>
+
+  <!-- The VideoLAN package contains all Windows architectures. Auralis currently publishes one
+       architecture per archive, so keeping the other native engines would add hundreds of MB
+       without making the x64 executable portable to those architectures. -->
+  <Target Name="TrimUnusedLibVlcArchitectures"
+          AfterTargets="Publish"
+          Condition="'$(RuntimeIdentifier)' == 'win-x64'">
+    <RemoveDir Directories="$(PublishDir)libvlc\win-x86;$(PublishDir)libvlc\win-arm64" />
+    <Delete Files="$(PublishDir)libvlc\win-x64\libvlc.lib;$(PublishDir)libvlc\win-x64\libvlccore.lib" />
+  </Target>
+
+  <Import Project="ThirdPartyNotices.targets" />
+</Project>

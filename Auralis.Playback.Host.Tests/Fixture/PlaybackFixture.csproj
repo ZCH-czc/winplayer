@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Auralis.Playback.Fixture</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Auralis.Playback.Abstractions/Auralis.Playback.Abstractions.csproj" />
+    <!-- Deliberately forbidden dependency, used only to prove the package loader refuses host fallback. -->
+    <ProjectReference Include="../../Auralis.Playback.Host/Auralis.Playback.Host.csproj" />
+  </ItemGroup>
+</Project>

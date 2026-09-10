@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Auralis.Playback.LibVlc/Auralis.Playback.LibVlc.csproj" />
+    <ProjectReference Include="../../Auralis.Playback.Host/Auralis.Playback.Host.csproj" />
+    <Compile Include="../../Auralis/Services/PlaybackServices.cs" Link="PlaybackServices.cs" />
+    <ProjectReference Include="../../Auralis.Platform.Abstractions/Auralis.Platform.Abstractions.csproj" />
+    <Compile Include="../../Auralis/MusicVideoWindow.xaml.cs" Link="MusicVideoWindow.xaml.cs" />
+    <Page Include="../../Auralis/MusicVideoWindow.xaml" Link="MusicVideoWindow.xaml" />
+    <Resource Include="../../Auralis/Assets/Auralis.ico" Link="Assets/Auralis.ico" />
+  </ItemGroup>
+</Project>

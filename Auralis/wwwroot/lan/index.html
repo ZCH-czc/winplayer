@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="referrer" content="no-referrer">
+  <title>Auralis LAN Player</title>
+  <link rel="stylesheet" href="lan-player.css">
+</head>
+<body>
+  <a class="skip-link" href="#library">Skip to library</a>
+
+  <div class="lan-app" id="lanApp" data-theme="system">
+    <header class="lan-topbar">
+      <a class="brand" href="./" aria-label="Auralis LAN Player">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span>auralis</span>
+        <em>LAN</em>
+      </a>
+
+      <div class="connection-state" id="connectionState" role="status" aria-live="polite">
+        <span class="connection-dot" aria-hidden="true"></span>
+        <span id="connectionText">Connecting</span>
+      </div>
+
+      <div class="topbar-actions">
+        <button class="icon-button" id="themeButton" type="button" aria-label="Toggle theme" title="Toggle theme">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2m0 14v2M5.64 5.64l1.42 1.42m9.88 9.88 1.42 1.42M3 12h2m14 0h2M5.64 18.36l1.42-1.42m9.88-9.88 1.42-1.42"/><circle cx="12" cy="12" r="4"/></svg>
+        </button>
+        <button class="secondary-button" id="reconnectButton" type="button">Reconnect</button>
+      </div>
+    </header>
+
+    <main class="lan-layout" id="mainContent">
+      <section class="now-playing-card" aria-labelledby="nowPlayingTitle">
+        <div class="cover-wrap">
+          <img id="nowCover" class="cover-image" alt="" hidden>
+          <div class="cover-fallback" aria-hidden="true">♫</div>
+        </div>
+        <div class="now-copy" aria-live="polite">
+          <p class="eyebrow" id="nowEyebrow">LAN PLAYER</p>
+          <h1 id="nowPlayingTitle">Nothing is playing</h1>
+          <p id="nowArtist">Choose music from the library</p>
+        </div>
+        <div class="now-controls" aria-label="Playback controls">
+          <button class="icon-button" id="shuffleButton" type="button" aria-pressed="false" aria-label="Shuffle" title="Shuffle">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h2.5c5 0 6.5 12 12 12H21m-4-4 4 4-4 4M3 18h2.5c2.2 0 3.7-2.3 5.1-4.9M16 6h5m-4-4 4 4-4 4"/></svg>
+          </button>
+          <button class="icon-button" id="previousButton" type="button" aria-label="Previous" title="Previous">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 6l-9 6 9 6Z"/></svg>
+          </button>
+          <button class="play-button" id="playButton" type="button" aria-label="Play" title="Play">
+            <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 9 6-9 6Z"/></svg>
+            <svg class="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12"/></svg>
+          </button>
+          <button class="icon-button" id="nextButton" type="button" aria-label="Next" title="Next">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M6 6l9 6-9 6Z"/></svg>
+          </button>
+          <button class="icon-button" id="repeatButton" type="button" aria-pressed="false" aria-label="Repeat off" title="Repeat off">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 2 4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14-1v2a3 3 0 0 1-3 3H3"/></svg>
+            <span class="repeat-one" aria-hidden="true">1</span>
+          </button>
+        </div>
+        <div class="progress-row">
+          <span id="currentTime">0:00</span>
+          <input id="progressSlider" type="range" min="0" max="1000" value="0" aria-label="Playback position">
+          <span id="duration">0:00</span>
+        </div>
+        <div class="volume-row">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6.5 9H3v6h3.5l4.5 4Zm4 4a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12"/></svg>
+          <label class="visually-hidden" for="volumeSlider">Volume</label>
+          <input id="volumeSlider" type="range" min="0" max="1" value="0.75" step="0.01">
+        </div>
+      </section>
+
+      <section class="library-panel" id="library" aria-labelledby="libraryTitle">
+        <header class="section-header">
+          <div>
+            <p class="eyebrow">YOUR MUSIC</p>
+            <h2 id="libraryTitle">Library</h2>
+            <p id="librarySummary">Waiting for your paired library</p>
+          </div>
+          <label class="search-box" for="searchInput">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+            <input id="searchInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search songs, artists, or albums">
+          </label>
+        </header>
+        <div class="library-status" id="libraryStatus" role="status" aria-live="polite"></div>
+        <div class="track-list" id="trackList" role="list" aria-label="Music library"></div>
+      </section>
+
+      <aside class="queue-panel" id="queuePanel" aria-labelledby="queueTitle">
+        <header class="queue-header">
+          <div><p class="eyebrow">UP NEXT</p><h2 id="queueTitle">Queue</h2></div>
+          <span class="queue-count" id="queueCount">0</span>
+        </header>
+        <div class="queue-list" id="queueList" role="list" aria-label="Play queue"></div>
+      </aside>
+    </main>
+
+    <section class="pairing-card" id="pairingCard" hidden role="alert" aria-labelledby="pairingTitle">
+      <div class="pairing-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 2"/><path d="M17 3h4v4"/></svg></div>
+      <div><h2 id="pairingTitle">Pair this browser again</h2><p id="pairingMessage">Open the Auralis LAN Player link on your desktop and scan or copy a new pairing link.</p></div>
+      <button class="accent-button" id="pairingRetryButton" type="button">Try again</button>
+    </section>
+
+    <footer class="lan-footer"><span>Auralis LAN Player</span><span id="libraryVersion"></span></footer>
+  </div>
+
+  <audio id="audio" preload="metadata" playsinline></audio>
+  <script src="lan-player.js" defer></script>
+</body>
+</html>

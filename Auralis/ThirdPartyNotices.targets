@@ -1,0 +1,22 @@
+<Project>
+  <!-- Use resolved package locations/versions, never a developer's NuGet cache path. This
+       copies upstream documents verbatim; it is not a license-compliance certification. -->
+  <Target Name="CollectAuralisThirdPartyNotices"
+          BeforeTargets="ComputeFilesToPublish" DependsOnTargets="ResolveReferences">
+    <Error Condition="!Exists('$(PkgMicrosoft_Web_WebView2)\LICENSE.txt') Or !Exists('$(PkgMicrosoft_Web_WebView2)\NOTICE.txt')"
+           Text="WebView2 license/notice files are missing. Restore packages before publishing." />
+    <ItemGroup>
+      <_AuralisNoticePackage Include="Microsoft.Web.WebView2">
+        <PackageDirectory>$(PkgMicrosoft_Web_WebView2)</PackageDirectory>
+      </_AuralisNoticePackage>
+      <_AuralisNoticePackage Include="@(ResolvedRuntimePack)" />
+      <_AuralisNoticeFile Include="%(_AuralisNoticePackage.PackageDirectory)\LICENSE*;%(_AuralisNoticePackage.PackageDirectory)\NOTICE*;%(_AuralisNoticePackage.PackageDirectory)\THIRD-PARTY-NOTICES*;%(_AuralisNoticePackage.PackageDirectory)\*.nuspec">
+        <NoticePackage>%(_AuralisNoticePackage.Identity)</NoticePackage>
+      </_AuralisNoticeFile>
+      <ResolvedFileToPublish Include="@(_AuralisNoticeFile)">
+        <RelativePath>licenses\%(_AuralisNoticeFile.NoticePackage)\%(_AuralisNoticeFile.Filename)%(_AuralisNoticeFile.Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+</Project>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Auralis/Services/PlatformSettingsStore.cs" Link="PlatformSettingsStore.cs" />
+    <Compile Include="../Auralis/Services/PlatformBackendService.cs" Link="PlatformBackendService.cs" />
+    <Compile Include="../Auralis/Services/DefaultPlatformHostContextFactory.cs" Link="DefaultPlatformHostContextFactory.cs" />
+    <Compile Include="../Auralis/Services/WindowsPlatformCredentialStore.cs" Link="WindowsPlatformCredentialStore.cs" />
+    <Compile Include="../Auralis/Services/AppLogging.cs" Link="AppLogging.cs" />
+    <Compile Include="../Auralis/Services/OnlinePlatformCoordinator*.cs" Link="%(Filename)%(Extension)" />
+    <Compile Include="../Auralis/Services/CommentAvatarRegistry.cs" Link="CommentAvatarRegistry.cs" />
+    <Compile Include="../Auralis/Services/SavedPlaylistStore.cs" Link="SavedPlaylistStore.cs" />
+    <Compile Include="../Auralis/Services/SavedTrackMetadata.cs" Link="SavedTrackMetadata.cs" />
+    <ProjectReference Include="../Auralis.Platform.Host/Auralis.Platform.Host.csproj" />
+    <ProjectReference Include="../Auralis.Artwork.Http/Auralis.Artwork.Http.csproj" />
+  </ItemGroup>
+</Project>

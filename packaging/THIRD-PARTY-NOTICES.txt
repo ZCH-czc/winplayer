@@ -1,0 +1,50 @@
+Auralis 第三方组件声明
+======================
+
+Microsoft.Web.WebView2 1.0.4129.50
+--------------------------------
+Copyright (c) Microsoft Corporation. All rights reserved.
+The SDK/loader package's original LICENSE.txt, NOTICE.txt and NuGet metadata are
+included under licenses/Microsoft.Web.WebView2. The installed Microsoft Edge
+WebView2 Runtime is separate from this application's SDK/loader distribution.
+Project: https://learn.microsoft.com/microsoft-edge/webview2/
+
+.NET / Windows Desktop / ASP.NET Core and Windows SDK .NET projections
+-------------------------------------------------------------------
+Self-contained builds include the resolved .NET runtime packs. Their versions,
+source references and license declarations are recorded in the original NuGet
+metadata under licenses/<package-id>. License and third-party notice files present
+at each resolved package root are preserved there without modification. Actual
+runtime versions are also listed in Auralis.runtimeconfig.json; do not infer them
+from the Auralis application version. Framework-dependent builds do not bundle
+those .NET runtime packs. Windows SDK .NET projection metadata is retained when
+the SDK resolves it as a runtime pack.
+
+This inventory and automated document copying do not certify complete license
+compliance. In particular, the VideoLAN package's individual native modules and
+corresponding-source distribution requirements need separate release review.
+
+LibVLCSharp 3.10.1
+------------------
+Copyright (c) VideoLAN and LibVLCSharp contributors.
+License: GNU Lesser General Public License, version 2.1 or later (LGPL-2.1-or-later)
+Project/source: https://code.videolan.org/videolan/LibVLCSharp
+Package: https://www.nuget.org/packages/LibVLCSharp/3.10.1
+Original package metadata: licenses/LibVLCSharp/libvlcsharp.nuspec
+
+VideoLAN.LibVLC.Windows 3.0.23.1
+--------------------------------
+Copyright (c) VideoLAN and VLC contributors.
+License: GNU Lesser General Public License, version 2.1 or later (LGPL-2.1-or-later),
+with individual modules retaining their applicable compatible notices.
+Project/source: https://code.videolan.org/videolan/vlc
+Package: https://www.nuget.org/packages/VideoLAN.LibVLC.Windows/3.0.23.1
+Original package metadata: licenses/VideoLAN.LibVLC.Windows/videolan.libvlc.windows.nuspec
+
+Auralis uses these libraries through dynamic loading. The offline LGPL 2.1 license text is
+included at licenses/LibVLC/LGPL-2.1.txt, with source references and review limitations in
+licenses/LibVLC/SOURCES.txt. Package metadata is copied from the actual resolved dependencies,
+not synthesized from this summary. The application code's LICENSE does not replace dependency
+licenses. These notices are not a complete corresponding-source archive or a certification of
+public binary distribution compliance; review exact native modules and source obligations before
+a public binary release.

@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-CN" data-language-preference="system">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Auralis</title>
+  <link rel="stylesheet" href="styles.css?v=20260909-brand-search-r1">
+</head>
+<body>
+  <div id="splash" class="splash" aria-label="Auralis 正在启动">
+    <div class="splash-glow"></div>
+    <img class="splash-logo" src="assets/auralis-icon.png" alt="" aria-hidden="true">
+    <div class="splash-name">auralis</div>
+    <div class="splash-caption">本地音乐播放器</div>
+  </div>
+
+  <div id="app" class="app is-loading">
+    <header id="titlebar" class="titlebar">
+      <div class="brand" data-no-drag>
+        <span>auralis</span>
+      </div>
+      <div class="title-drag-region" aria-hidden="true"></div>
+      <div class="window-actions" data-no-drag>
+        <button class="window-button" id="minimizeButton" aria-label="最小化">
+          <svg viewBox="0 0 16 16"><path d="M3 8.5h10"/></svg>
+        </button>
+        <button class="window-button" id="maximizeButton" aria-label="最大化">
+          <svg class="maximize-icon" viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx=".5"/></svg>
+          <svg class="restore-icon" viewBox="0 0 16 16"><path d="M5.5 5.5V3.75c0-.41.34-.75.75-.75h6c.41 0 .75.34.75.75v6c0 .41-.34.75-.75.75H10.5M3.75 5.5h6c.41 0 .75.34.75.75v6c0 .41-.34.75-.75.75h-6A.75.75 0 0 1 3 12.25v-6c0-.41.34-.75.75-.75Z"/></svg>
+        </button>
+        <button class="window-button close" id="closeButton" aria-label="关闭">
+          <svg viewBox="0 0 16 16"><path d="m4 4 8 8m0-8-8 8"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <aside class="sidebar">
+      <div class="nav-section-label first">本地音乐</div>
+      <nav class="navigation" aria-label="主导航">
+        <button class="nav-item" id="sidebarSearchButton" aria-label="搜索" title="搜索">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>
+          <span>搜索</span>
+        </button>
+        <button class="nav-item active" data-page="songs" aria-label="歌曲" title="歌曲">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 8l11-2M5.5 21C7.43 21 9 19.88 9 18.5S7.43 16 5.5 16 2 17.12 2 18.5 3.57 21 5.5 21Zm11-2c1.93 0 3.5-1.12 3.5-2.5S18.43 14 16.5 14 13 15.12 13 16.5s1.57 2.5 3.5 2.5Z"/></svg></span>
+          <span>歌曲</span><span id="songCountBadge" class="nav-count">0</span>
+        </button>
+        <button class="nav-item" data-page="albums" aria-label="专辑" title="专辑">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 3a9 9 0 0 0 0 18"/></svg></span>
+          <span>专辑</span>
+        </button>
+        <button class="nav-item" data-page="artists" aria-label="艺术家" title="艺术家">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.65-4.18 3.15-6.5 7.5-6.5s6.85 2.32 7.5 6.5"/></svg></span>
+          <span>艺术家</span>
+        </button>
+      </nav>
+
+      <div class="nav-section-label">歌单</div>
+      <nav class="navigation secondary" aria-label="歌单">
+        <button class="nav-item" data-page="favorites" aria-label="我喜欢的" title="我喜欢的">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20.8 4.9a5.4 5.4 0 0 0-7.64 0L12 6.06 10.84 4.9a5.4 5.4 0 1 0-7.64 7.64L12 21.3l8.8-8.76a5.4 5.4 0 0 0 0-7.64Z"/></svg></span>
+          <span>我喜欢的</span>
+        </button>
+        <button class="nav-item" data-page="recent" aria-label="最近播放" title="最近播放">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4.93 4.93a10 10 0 1 1-2.6 9.57M3 4v6h6"/><path d="M12 7v5l3 2"/></svg></span>
+          <span>最近播放</span>
+        </button>
+        <button class="nav-item" data-page="onlinePlaylists" aria-label="在线歌单" title="在线歌单">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 9.5h8M8 13h5M17 15.5v-4l3-.7v3.7M15.8 18c.66 0 1.2-.4 1.2-.9s-.54-.9-1.2-.9-1.2.4-1.2.9.54.9 1.2.9Z"/></svg></span>
+          <span>在线歌单</span>
+        </button>
+        <button class="nav-item" data-page="savedPlaylists" aria-label="我的歌单" title="我的歌单">
+          <span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 6h12M4 12h12M4 18h7M19 14v8m-4-4h8"/></svg></span><span>我的歌单</span>
+        </button>
+      </nav>
+
+      <button class="nav-item settings-link" data-page="settings" aria-label="设置" title="设置">
+        <span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.55v-.1A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4.1 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2.3V9.55h.1A1.7 1.7 0 0 0 4.1 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06L6.56 3.7l.06.06A1.7 1.7 0 0 0 8.5 4.1a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V2.3h4.05v.1A1.7 1.7 0 0 0 15 4.1a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 8.5a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1v4.05h-.1A1.7 1.7 0 0 0 19.4 15Z"/></svg></span>
+        <span>设置</span>
+      </button>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <input id="searchInput" type="search" placeholder="搜索歌曲、艺术家或专辑" autocomplete="off" spellcheck="false">
+          <button id="clearSearchButton" class="search-clear" aria-label="清空搜索" title="清空搜索">
+            <svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg>
+          </button>
+          <kbd>Ctrl K</kbd>
+        </div>
+        <div class="topbar-actions">
+          <button id="themeQuickButton" class="icon-button" aria-label="切换主题" title="切换主题">
+            <svg class="sun-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+            <svg class="moon-icon" viewBox="0 0 24 24"><path d="M20.5 14.1A8.5 8.5 0 0 1 9.9 3.5 8.5 8.5 0 1 0 20.5 14.1Z"/></svg>
+          </button>
+          <button id="addTopButton" class="accent-button small">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> 添加音乐
+          </button>
+        </div>
+      </div>
+      <section id="pageContent" class="page-content" aria-live="polite"></section>
+    </main>
+
+    <footer id="playerBar" class="player-bar is-empty">
+      <button id="nowPlayingButton" class="track-summary" aria-label="展开正在播放">
+        <div id="miniCover" class="mini-cover"><div class="cover-note">♪</div></div>
+        <div class="track-summary-text">
+          <strong id="miniTitle">还没有播放音乐</strong>
+          <span id="miniArtist">从音乐库中选择一首歌曲</span>
+        </div>
+      </button>
+      <div class="transport">
+        <div class="transport-buttons">
+          <button id="shuffleButton" class="player-icon-button compact" aria-label="随机播放" title="随机播放">
+            <svg viewBox="0 0 24 24"><path d="M3 6h2.5c5 0 6.5 12 12 12H21m-4-4 4 4-4 4M3 18h2.5c2.2 0 3.7-2.3 5.1-4.9M16 6h5m-4-4 4 4-4 4"/></svg>
+          </button>
+          <button id="previousButton" class="player-icon-button" aria-label="上一首">
+            <svg viewBox="0 0 24 24"><path d="M6 5v14M18 6l-9 6 9 6Z"/></svg>
+          </button>
+          <button id="playButton" class="play-button" aria-label="播放">
+            <span class="play-glyph" aria-hidden="true">
+              <svg class="play-icon" viewBox="0 0 24 24"><path d="m9 6 9 6-9 6Z"/></svg>
+              <svg class="pause-icon" viewBox="0 0 24 24"><path d="M8 6v12M16 6v12"/></svg>
+            </span>
+          </button>
+          <button id="nextButton" class="player-icon-button" aria-label="下一首">
+            <svg viewBox="0 0 24 24"><path d="M18 5v14M6 6l9 6-9 6Z"/></svg>
+          </button>
+          <button id="queueButton" class="player-icon-button" aria-label="播放列表" title="播放列表">
+            <svg viewBox="0 0 24 24"><path d="M4 6h11M4 12h11M4 18h7M18 15v6m-3-3h6"/></svg>
+          </button>
+        </div>
+        <input id="progressSlider" class="range dock-progress" type="range" min="0" max="1000" value="0" aria-label="播放进度">
+      </div>
+      <div class="player-extras">
+        <span class="stream-quality-badge" data-stream-quality hidden aria-live="polite"></span>
+        <span class="dock-time"><span id="currentTime">0:00</span> / <span id="duration">0:00</span></span>
+        <button id="favoriteCurrentButton" class="player-icon-button compact" aria-label="收藏当前歌曲">
+          <svg viewBox="0 0 24 24"><path d="M20.8 4.9a5.4 5.4 0 0 0-7.64 0L12 6.06 10.84 4.9a5.4 5.4 0 1 0-7.64 7.64L12 21.3l8.8-8.76a5.4 5.4 0 0 0 0-7.64Z"/></svg>
+        </button>
+        <button id="desktopLyricsButton" class="player-icon-button compact" aria-label="桌面歌词" title="桌面歌词">
+          <svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h10M5 17h7"/></svg>
+        </button>
+        <div class="volume-control">
+          <svg viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5l4.5 4Zm4 4a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12"/></svg>
+          <input id="volumeSlider" class="range volume" type="range" min="0" max="1" value="0.75" step="0.01" aria-label="音量">
+        </div>
+        <button id="speedButton" class="speed-button" aria-label="倍速播放" title="倍速播放">
+          1.00x
+        </button>
+      </div>
+      <audio id="audio" preload="metadata"></audio>
+    </footer>
+
+    <aside id="queuePanel" class="queue-panel" aria-hidden="true">
+      <div class="panel-header">
+        <div><span class="eyebrow">UP NEXT</span><h2>播放队列</h2></div>
+        <button id="closeQueueButton" class="icon-button" aria-label="关闭播放队列">
+          <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div id="queueList" class="queue-list"></div>
+    </aside>
+    <div id="queueScrim" class="scrim"></div>
+
+    <section id="nowPlayingOverlay" class="now-playing-overlay" aria-hidden="true">
+      <div class="now-playing-backdrop"></div>
+      <header class="immersive-toolbar">
+        <div class="immersive-toolbar-group">
+          <button id="closeNowPlayingButton" class="immersive-icon-button" aria-label="收起详情页" title="收起详情页">
+            <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button id="pinButton" class="immersive-icon-button" aria-label="置顶" title="置顶">
+            <svg viewBox="0 0 24 24"><path d="m9 4 6 0-.7 5 3.2 3.2v1.3h-11v-1.3L9.7 9ZM12 13.5V21"/></svg>
+          </button>
+        </div>
+        <div class="immersive-toolbar-group">
+          <div id="fullscreenThemeSelector" class="fullscreen-theme-selector" data-theme-selector role="group" aria-label="全屏播放器主题">
+            <button type="button" class="fullscreen-theme-system" data-fullscreen-theme="system" aria-label="跟随系统主题" title="跟随系统主题">
+              <svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="12" rx="2"/><path d="M9 20h6M12 16.5V20"/></svg>
+            </button>
+            <button class="day-night-theme-toggle" type="button" data-day-night-toggle aria-label="切换到深色主题" title="切换到深色主题">
+              <span class="day-night-sky" aria-hidden="true">
+                <span class="day-night-stars"><i></i><i></i><i></i><i></i><i></i></span>
+                <span class="day-night-clouds"><i></i><i></i><i></i><i></i></span>
+                <span class="day-night-celestial"><i></i><i></i><i></i></span>
+              </span>
+            </button>
+          </div>
+          <button id="fullscreenButton" class="immersive-icon-button" aria-label="全屏 F11" title="全屏 (F11)">
+            <svg class="enter-fullscreen-icon" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M8 21H3v-5m13 5h5v-5"/></svg>
+            <svg class="exit-fullscreen-icon" viewBox="0 0 24 24"><path d="M3 8h5V3m8 5h5V3M3 16h5v5m8-5h5v5"/></svg>
+          </button>
+          <button id="overlayMinimizeButton" class="immersive-icon-button" aria-label="最小化"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+          <button id="overlayMaximizeButton" class="immersive-icon-button" aria-label="最大化"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg></button>
+          <button id="overlayCloseWindowButton" class="immersive-icon-button close" aria-label="关闭"><svg viewBox="0 0 24 24"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+        </div>
+      </header>
+      <div class="immersive-stage">
+        <section class="record-lyrics-panel" aria-label="歌曲与歌词">
+          <div class="record-heading">
+            <h2 id="stageTitle">还没有播放音乐</h2>
+            <p id="stageArtist">未知艺术家</p>
+            <div class="lyrics-meta"><span id="lyricsSourceBadge">本地歌词</span><span id="lyricsSyncBadge"></span></div>
+          </div>
+          <div id="lyricsViewport" class="lyrics-viewport" aria-label="歌词">
+            <div id="lyricsScroll" class="lyrics-scroll">
+              <div class="lyrics-status"><strong>等待播放</strong><span>本地歌词优先，在线歌词默认关闭</span></div>
+            </div>
+          </div>
+        </section>
+        <div class="record-visual" aria-label="唱片封面">
+          <div class="vinyl-disc">
+            <div id="largeCover" class="large-cover"><img id="largeCoverImage" class="large-cover-image" alt="" hidden><div class="large-note">♪</div><div class="cover-shine"></div></div>
+          </div>
+        </div>
+        <div class="lyrics-placeholder">暂无歌词</div>
+      </div>
+      <footer class="immersive-player">
+        <div class="immersive-track-info"><h1 id="largeTitle">还没有播放音乐</h1><p id="largeArtist">未知艺术家</p></div>
+        <div class="immersive-controls">
+          <button id="overlayRepeatButton" class="player-icon-button" aria-label="播放模式"><svg viewBox="0 0 24 24"><path d="m17 2 4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14-1v2a3 3 0 0 1-3 3H3"/></svg></button>
+          <button id="overlayPreviousButton" class="player-icon-button" aria-label="上一首"><svg viewBox="0 0 24 24"><path d="M6 5v14M18 6l-9 6 9 6Z"/></svg></button>
+          <button id="overlayPlayButton" class="play-button immersive" aria-label="播放"><span class="play-glyph" aria-hidden="true"><svg class="play-icon" viewBox="0 0 24 24"><path d="m9 6 9 6-9 6Z"/></svg><svg class="pause-icon" viewBox="0 0 24 24"><path d="M8 6v12M16 6v12"/></svg></span></button>
+          <button id="overlayNextButton" class="player-icon-button" aria-label="下一首"><svg viewBox="0 0 24 24"><path d="M18 5v14M6 6l9 6-9 6Z"/></svg></button>
+          <button id="overlayQueueButton" class="player-icon-button" aria-label="播放列表"><svg viewBox="0 0 24 24"><path d="M4 6h11M4 12h11M4 18h7M18 15v6m-3-3h6"/></svg></button>
+        </div>
+        <div class="immersive-extras">
+          <span class="stream-quality-badge immersive-quality" data-stream-quality hidden aria-live="polite"></span>
+          <span class="immersive-time"><span id="overlayCurrentTime">0:00</span> / <span id="overlayDuration">0:00</span></span>
+          <div id="lyricsSourceSwitcher" class="lyrics-source-switcher" role="group" aria-label="歌词来源" aria-busy="false">
+            <button type="button" data-lyrics-source="local" aria-pressed="true" title="使用本地歌词">本地</button>
+            <button type="button" data-lyrics-source="online" aria-pressed="false" title="为当前歌曲匹配在线歌词">在线</button>
+          </div>
+          <button id="lyricsOptionsButton" class="player-icon-button" aria-label="歌词选项" title="歌词选项"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h10M5 17h7"/></svg></button>
+          <div class="immersive-volume"><svg viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5l4.5 4Zm4 4a4 4 0 0 1 0 6m2-9a8 8 0 0 1 0 12"/></svg><input id="overlayVolumeSlider" class="range volume" type="range" min="0" max="1" value="0.75" step="0.01" aria-label="音量"></div>
+          <button id="overlaySpeedButton" class="speed-button" aria-label="倍速播放">1.00x</button>
+        </div>
+        <input id="overlayProgressSlider" class="range immersive-progress" type="range" min="0" max="1000" value="0" aria-label="播放进度">
+      </footer>
+      <div id="lyricsOptionsMenu" class="lyrics-options-menu" aria-hidden="true">
+        <span>当前歌曲歌词</span>
+        <button data-lyrics-command="pick"><strong>选择本地歌词文件</strong><small>支持 .lrc 与 .txt，优先用于这首歌</small></button>
+        <button data-lyrics-command="reset"><strong>恢复自动匹配</strong><small>移除这首歌指定的本地歌词</small></button>
+        <button data-lyrics-command="clear"><strong>清除歌词缓存</strong><small>只清除当前歌曲，不影响其他歌曲</small></button>
+      </div>
+    </section>
+
+    <div id="lyricsCacheDialog" class="modal-layer lyrics-cache-dialog" role="dialog" aria-modal="true" aria-labelledby="lyricsCacheDialogTitle" aria-hidden="true" inert>
+      <div class="modal-scrim" data-cache-dialog-close></div>
+      <section class="modal-card">
+        <header class="modal-header">
+          <div><span class="eyebrow">LOCAL LYRICS</span><h2 id="lyricsCacheDialogTitle">逐歌曲歌词缓存</h2><p id="lyricsCacheDialogCount">0 首歌曲</p></div>
+          <button class="icon-button" type="button" data-action="close-lyrics-cache" aria-label="关闭逐歌曲歌词缓存">
+            <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+          </button>
+        </header>
+        <div class="modal-search-row">
+          <label class="modal-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input id="lyricsCacheSearch" type="search" autocomplete="off" spellcheck="false" placeholder="搜索歌曲、艺术家或歌词来源" aria-label="搜索逐歌曲歌词缓存"></label>
+          <button class="secondary-button compact-action" type="button" data-action="refresh-lyrics-cache">刷新</button>
+        </div>
+        <div id="lyricsCacheDialogList" class="lyrics-cache-list modal-cache-list"></div>
+      </section>
+    </div>
+
+    <div id="toastRegion" class="toast-region" aria-live="polite"></div>
+  </div>
+  <script src="i18n.js?v=20260909-audio-information-r1"></script>
+  <script src="lyrics-clock.js?v=20260906-saved-r1"></script>
+  <link rel="stylesheet" href="media-hub.css?v=20260906-saved-r1">
+  <link rel="stylesheet" href="window-surfaces.css?v=20260906-saved-r1">
+  <script src="media-hub.js?v=20260908-media-capability-lifetime-r1"></script>
+  <script src="search-history.js?v=20260906-saved-r1"></script>
+  <script src="playback-components.js?v=20260908-plugin-advanced-r1"></script>
+  <script src="media-transport-components.js?v=20260908-plugin-advanced-r1"></script>
+  <script src="app.js?v=20260909-audio-information-r1"></script>
+</body>
+</html>

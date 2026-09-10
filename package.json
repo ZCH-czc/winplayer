@@ -1,0 +1,17 @@
+{
+  "name": "auralis-ui-regressions",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Development-only regressions for Auralis; not part of the player runtime.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "npm run test:logic",
+    "test:logic": "node --test tools/Test-LyricsClock.cjs tools/Test-PlaybackPlanning.cjs tools/Test-PlatformTransitions.cjs tools/Test-SearchHistory.cjs",
+    "test:ui": "node tools/Run-UiTests.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

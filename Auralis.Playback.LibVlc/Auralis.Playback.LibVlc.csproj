@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Version>0.4.0</Version>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Auralis.Playback.Abstractions/Auralis.Playback.Abstractions.csproj" />
+    <PackageReference Include="LibVLCSharp" Version="3.10.1" GeneratePathProperty="true" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" GeneratePathProperty="true" />
+    <InternalsVisibleTo Include="MediaEngineSmoke" />
+  </ItemGroup>
+  <Import Project="ThirdPartyNotices.targets" />
+</Project>

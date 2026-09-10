@@ -1,0 +1,26 @@
+Bundled decoder source and license references
+============================================
+
+The adjacent LGPL-2.1.txt is the GNU LGPL 2.1 license text retrieved from
+https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt on 2026-09-08.
+The license permits verbatim redistribution. Its wording is not modified.
+
+The resolved LibVLCSharp and VideoLAN.LibVLC.Windows NuGet metadata is copied
+verbatim into the corresponding licenses/<package-id> directories. Consult
+those files for the actual package versions and declared license expressions.
+
+LibVLCSharp upstream repository:
+https://code.videolan.org/videolan/LibVLCSharp
+Its NuGet metadata includes the upstream source commit where supplied.
+
+Native LibVLC NuGet packaging repository:
+https://code.videolan.org/videolan/libvlc-nuget
+VLC source repository:
+https://code.videolan.org/videolan/vlc
+
+These are source references, not a claim that this package includes complete
+corresponding source, build scripts, or every dependency/module notice.
+Before public binary distribution, review the exact native package, its modules,
+and applicable corresponding-source/notice requirements. Do not substitute a
+generic repository link for that release review or infer the native source commit
+from a NuGet version. No downloader or online license fetch runs during builds.

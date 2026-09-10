@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp" Version="3.10.1" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
+    <ProjectReference Include="../../Auralis.Playback.LibVlc/Auralis.Playback.LibVlc.csproj" />
+    <ProjectReference Include="../../Auralis.Playback.Host/Auralis.Playback.Host.csproj" />
+    <ProjectReference Include="../../Auralis.MediaTransport.Http/Auralis.MediaTransport.Http.csproj" />
+    <ProjectReference Include="../../Auralis.MediaTransport.Host/Auralis.MediaTransport.Host.csproj" />
+  </ItemGroup>
+</Project>

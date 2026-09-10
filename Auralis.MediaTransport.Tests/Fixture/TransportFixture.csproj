@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AssemblyName>Auralis.MediaTransport.Fixture</AssemblyName><NuGetAudit>false</NuGetAudit></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../Auralis.MediaTransport.Abstractions/Auralis.MediaTransport.Abstractions.csproj" /></ItemGroup>
+</Project>

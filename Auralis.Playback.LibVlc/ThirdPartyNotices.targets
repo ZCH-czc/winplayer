@@ -1,0 +1,27 @@
+<Project>
+  <!-- Owned by the bundled decoder project: the player does not acquire direct decoder
+       package dependencies just to collect notices. Restore supplies the actual cache paths. -->
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)licenses\LibVLC\LGPL-2.1.txt;$(MSBuildThisFileDirectory)licenses\LibVLC\SOURCES.txt">
+      <Link>licenses\LibVLC\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(PkgLibVLCSharp)\libvlcsharp.nuspec">
+      <Link>licenses\LibVLCSharp\libvlcsharp.nuspec</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(PkgVideoLAN_LibVLC_Windows)\videolan.libvlc.windows.nuspec">
+      <Link>licenses\VideoLAN.LibVLC.Windows\videolan.libvlc.windows.nuspec</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+  <Target Name="ValidateBundledDecoderNotices" BeforeTargets="GetCopyToOutputDirectoryItems;ComputeFilesToPublish">
+    <Error Condition="!Exists('$(PkgLibVLCSharp)\libvlcsharp.nuspec') Or !Exists('$(PkgVideoLAN_LibVLC_Windows)\videolan.libvlc.windows.nuspec')"
+           Text="Decoder package metadata is missing. Restore the bundled decoder dependencies before publishing." />
+    <Error Condition="!Exists('$(MSBuildThisFileDirectory)licenses\LibVLC\LGPL-2.1.txt') Or !Exists('$(MSBuildThisFileDirectory)licenses\LibVLC\SOURCES.txt')"
+           Text="Bundled decoder license/source notices are missing." />
+  </Target>
+</Project>

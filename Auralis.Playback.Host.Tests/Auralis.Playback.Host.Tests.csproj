@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Auralis.Playback.Host/Auralis.Playback.Host.csproj" />
+    <ProjectReference Include="Fixture/PlaybackFixture.csproj" ReferenceOutputAssembly="false" />
+    <Compile Remove="Fixture/**/*.cs" />
+  </ItemGroup>
+  <Target Name="CopyPlaybackFixture" AfterTargets="Build">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)/Fixture/bin/$(Configuration)/net8.0/Auralis.Playback.Fixture.dll" DestinationFolder="$(OutDir)fixture-payload" />
+  </Target>
+</Project>
