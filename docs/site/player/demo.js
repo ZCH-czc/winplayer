@@ -1,4 +1,4 @@
-/* Actual UI, synthetic clock. This file does not load, decode, or play media. */
+/* Actual UI. English uses a synthetic clock; Chinese follows parent audio time. */
 (() => {
   'use strict';
   const api=window.Auralis, root=document.documentElement;
@@ -9,21 +9,26 @@
   let running=false, timer=null, time=18, last=performance.now(), scene=-1, language='';
   const tracks=titles.map((title,i)=>({id:`demo-${i}`,title,artist:'Auralis',album:'Quiet Geometry',durationSeconds:204+i*13,fileName:`demo-${i}.flac`,extension:'.flac',sizeBytes:24000000,dateAdded:'2026-09-01T00:00:00Z',coverUrl:new URL('assets/public-preview.svg',location.href).href}));
   const quality={codec:'FLAC',bitrateKbps:941,sampleRateHz:48000,bitsPerSample:24,channels:2,isLossless:true,isAverageBitrate:true};
+  const song=window.AuralisDemoSong;
+  let audioState={currentTime:0,duration:241,playing:false};
+  const chinese=()=>language==='zh-CN'&&!!song;
+  const activeId=()=>chinese()?'dahai-demo':'demo-0';
   const click=id=>document.getElementById(id)?.click();
-  function playback(){api.setPlaybackState({id:'demo-0',isPlaying:running,currentTime:time,duration:204,audioInformation:quality});}
+  function settle(){if(!running)for(const animation of document.getAnimations?.()||[]){if(Number.isFinite(animation.effect?.getTiming().iterations))try{animation.finish();}catch{}}}
+  function playback(){api.setPlaybackState({id:activeId(),isPlaying:chinese()?audioState.playing:running,currentTime:chinese()?audioState.currentTime:time,duration:chinese()?audioState.duration:204,audioInformation:chinese()?{codec:'MP3',bitrateKbps:128,sampleRateHz:44100,channels:2,bitsPerSample:null,isLossless:false,isAverageBitrate:false}:quality});settle();}
   function loop(){
-    if(!running)return;
+    if(!running||chinese())return;
     const now=performance.now();time+=(now-last)/1000;last=now;
     if(time>=194)time=6;
     playback();timer=setTimeout(loop,250);
   }
   function play(value){
     if(running===value)return;
-    if(running)time+=(performance.now()-last)/1000;
+    if(running&&!chinese())time+=(performance.now()-last)/1000;
     running=value;clearTimeout(timer);timer=null;last=performance.now();
     document.body.dataset.demoPaused=String(!running);playback();
     if(!running)document.querySelector('.vinyl-disc').getAnimations().forEach(animation=>animation.pause());
-    if(running)timer=setTimeout(loop,250);
+    if(running&&!chinese())timer=setTimeout(loop,250);
   }
   // Existing delegated setting controls invoke the real layout handler.
   const settings=document.createElement('div');settings.hidden=true;settings.dataset.setting='playerStyle';
@@ -46,16 +51,26 @@
   api.receiveLibrary(tracks);api.setPlatformConfiguration({providers:[]});api.playLocalTrack('demo-0');
   api.setLyrics({trackId:'demo-0',source:'Local LRC',selectedSource:'local',isSynced:true,instrumental:false,
     lines:Array.from({length:35},(_,i)=>({timeSeconds:i*6,text:lines[i%lines.length]}))});
+  function selectLanguage(next){
+    play(false);language=next;
+    const locale=next==='zh-CN'?'zh-CN':'en-US';api.setUiLanguageState({preference:locale,resolvedLanguage:locale});
+    const localized=chinese()?{...tracks[0],id:activeId(),title:song.title,artist:song.artist,album:song.album,durationSeconds:song.duration,extension:'.mp3',fileName:'dahai-demo.mp3',sizeBytes:3857975,coverUrl:new URL('../assets/dahai/cover.jpg',location.href).href}:tracks[0];
+    api.receiveLibrary([localized,...tracks.slice(1)]);api.playLocalTrack(activeId());
+    api.setLyrics({trackId:activeId(),source:'Local LRC',selectedSource:'local',isSynced:true,instrumental:false,lines:chinese()?song.lines:Array.from({length:35},(_,i)=>({timeSeconds:i*6,text:lines[i%lines.length]}))});
+    playback();
+  }
   playback();click('nowPlayingButton');document.body.dataset.demoPaused='true';setScene(0);
   window.addEventListener('message',event=>{
     if(event.source!==parent||event.origin!==location.origin)return;
     const m=event.data;
     if(m?.type==='auralis-demo-ping'){parent.postMessage({type:'auralis-demo-ready'},location.origin);return;}
     if(m?.type!=='auralis-demo-state'||!Number.isInteger(m.scene)||m.scene<0||m.scene>=scenes.length||typeof m.running!=='boolean'||!['en','zh-CN'].includes(m.language))return;
-    if(language!==m.language){language=m.language;const locale=language==='zh-CN'?'zh-CN':'en-US';api.setUiLanguageState({preference:locale,resolvedLanguage:locale});}
-    play(m.running&&!document.hidden&&!matchMedia('(prefers-reduced-motion: reduce)').matches);setScene(m.scene);
+    if(language!==m.language)selectLanguage(m.language);
+    if(chinese()&&m.audio&&Number.isFinite(m.audio.currentTime)&&m.audio.currentTime>=0&&m.audio.currentTime<=600&&Number.isFinite(m.audio.duration)&&m.audio.duration>0&&m.audio.duration<=600&&typeof m.audio.playing==='boolean')audioState={currentTime:m.audio.currentTime,duration:m.audio.duration,playing:m.audio.playing};
+    play(m.running&&(!chinese()||audioState.playing)&&!document.hidden&&!matchMedia('(prefers-reduced-motion: reduce)').matches);setScene(m.scene);playback();
   });
   document.addEventListener('visibilitychange',()=>{if(document.hidden)play(false);});
+  document.addEventListener('load',settle,true);
   window.addEventListener('pagehide',()=>play(false));
   parent.postMessage({type:'auralis-demo-ready'},location.origin);
 })();

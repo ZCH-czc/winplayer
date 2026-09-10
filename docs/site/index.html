@@ -12,6 +12,8 @@
   <script src="gallery.js" defer></script>
   <script src="app.js" defer></script>
   <script src="customize.js" defer></script>
+  <link rel="stylesheet" href="song.css">
+  <script src="song.js" defer></script>
 </head>
 <body>
   <div class="page-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
@@ -33,6 +35,14 @@
           <button class="chapter" data-chapter="4" aria-pressed="false"><span class="chapter-number">05</span><span data-i18n="chapter5">Up next</span><i aria-hidden="true"></i></button>
           <button class="chapter" data-chapter="5" aria-pressed="false"><span class="chapter-number">06</span><span data-i18n="chapter6">Keep the words close</span><i aria-hidden="true"></i></button>
         </div></div>
+        <div class="song-controls" id="song-controls" hidden aria-label="大海带不走试听">
+          <audio id="song-audio" preload="none" loop></audio>
+          <button type="button" id="song-play" aria-pressed="false">播放《大海带不走》</button>
+          <div class="song-progress"><label for="song-seek">泠鸢yousa · 大海带不走</label><input id="song-seek" type="range" min="0" max="241" step="0.1" value="0" aria-label="歌曲进度" disabled></div>
+          <output id="song-time" for="song-seek">0:00 / 4:01</output>
+          <label class="song-volume">音量<input id="song-volume" type="range" min="0" max="1" step="0.05" value="0.45" aria-label="试听音量"></label>
+          <span id="song-status" role="status">点击播放后，唱片与 LRC 跟随音乐进度。</span>
+        </div>
         <figcaption data-i18n="demoNote">Live light / dark transition · Screenshot carousel for layouts and panels</figcaption>
       </figure></div>
     </section>

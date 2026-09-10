@@ -15,6 +15,16 @@
   const apply=accent=>{
     const button=document.createElement('button');button.hidden=true;button.dataset.accent=accent;
     document.getElementById('pageContent').append(button);button.click();button.remove();
+    if(language==='zh-CN'&&window.AuralisDemoSong){
+      const song=window.AuralisDemoSong,preview=document.querySelector('[data-fullscreen-preview]');
+      preview.querySelector('figcaption strong').textContent=song.title;
+      preview.querySelector('figcaption small').textContent=`${song.artist} · 设置预览，不播放音频`;
+      preview.querySelector('.fullscreen-preview-track strong').textContent=song.title;
+      preview.querySelector('.fullscreen-preview-track span').textContent=song.artist;
+      preview.querySelectorAll('.fullscreen-preview-lyrics > *').forEach((el,i)=>el.textContent=song.lines.filter(line=>line.timeSeconds>=43)[i].text);
+      preview.querySelector('.fullscreen-preview-cover').style.backgroundImage=`url("${new URL('../assets/dahai/cover.jpg',location.href).href}")`;
+      preview.querySelector('.fullscreen-preview-cover').style.backgroundSize='cover';
+    }
   };
   window.addEventListener('message',event=>{
     if(event.source!==parent||event.origin!==location.origin)return;

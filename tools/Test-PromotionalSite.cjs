@@ -7,7 +7,10 @@ function walk(directory){for(const item of fs.readdirSync(directory,{withFileTyp
   const file=path.join(directory,item.name);assert(!item.isSymbolicLink(),'no linked publication files');
   assert(!['.git','.openai','node_modules','bin','obj','profiles'].includes(item.name),'no private/build state');
   if(item.isDirectory()){walk(file);continue;}
-  assert(item.isFile());assert(!/\.(pfx|p12|pem|dll|exe|msix|mp3|m4a|flac|wav|mp4)$/i.test(file),'no binary packages, keys, or uncleared personal media');
+  assert(item.isFile());
+  const relative=path.relative(root,file).split(path.sep).join('/');
+  if(relative==='assets/dahai/audio.mp3')assert.equal(crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),'16f5016f3e382fd3047fa9892267474bc508b05f157fbb23db9b552f087b25ed','only owner-authorized promotional recording');
+  else assert(!/\.(pfx|p12|pem|dll|exe|msix|mp3|m4a|flac|wav|mp4)$/i.test(file),'no binary packages, keys, or uncleared personal media');
   count++;
   if(file.endsWith('.js'))new vm.Script(fs.readFileSync(file,'utf8'),{filename:file});
   if(file.endsWith('.html')){

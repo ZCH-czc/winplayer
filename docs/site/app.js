@@ -31,7 +31,8 @@
   let language='en',paused=false,scene=0,heroVisible=true,lyricsVisible=false,sceneTimer=null,lyricTimer=null,lyric=1;
   const words=()=>language==='zh-CN'?zh:en;
   const running=()=>!paused&&!reduce.matches&&!document.hidden;
-  function syncDemo(){if(demoReady)frame.contentWindow.postMessage({type:'auralis-demo-state',scene:Math.min(scene,1),language,running:scene<2&&running()&&heroVisible},window.location.origin);}
+  function syncDemo(){if(demoReady)frame.contentWindow.postMessage({type:'auralis-demo-state',scene:Math.min(scene,1),language,running:scene<2&&running()&&heroVisible,audio:window.AuralisFeaturedAudio?.snapshot()},window.location.origin);}
+  window.addEventListener('auralis-audio-change',syncDemo);
   function syncPicture(){
     stage.dataset.presentation=scene<2?'live':'image';
     const locale=language==='zh-CN'?'zh-CN':'en-US';
@@ -75,7 +76,7 @@
   function setLanguage(next){
     language=next;document.documentElement.lang=next;
     document.querySelectorAll('[data-i18n]').forEach(el=>{const value=words()[el.dataset.i18n];if(value!==undefined)el.textContent=value;});
-    document.querySelectorAll('[data-shot]').forEach(img=>{img.src=`assets/${img.dataset.shot}-${language==='zh-CN'?'zh-CN':'en-US'}.png`;});
+    document.querySelectorAll('[data-shot]').forEach(img=>{img.src=language==='zh-CN'&&img.dataset.shot==='player'?'assets/gallery/scene-0-zh-CN.png':`assets/${img.dataset.shot}-${language==='zh-CN'?'zh-CN':'en-US'}.png`;});
     const alt=language==='zh-CN'?{player:'Auralis 深色唱片与歌词播放页面。',library:'Auralis 本地曲库与持续可用的底部播放栏。',customize:'Auralis 全屏播放器设置及外观预览。'}:{player:'Auralis record-and-lyrics playback page, in the dark theme.',library:'Auralis local song library with its persistent playback bar.',customize:'Auralis player customization with a visual preview.'};
     document.querySelectorAll('[data-shot]').forEach(img=>img.alt=alt[img.dataset.shot]);
     languageButton.textContent=language==='zh-CN'?'EN':'中文';languageButton.lang=language==='zh-CN'?'en':'zh-CN';
