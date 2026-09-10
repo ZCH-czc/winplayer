@@ -15,7 +15,7 @@ function walk(directory){for(const item of fs.readdirSync(directory,{withFileTyp
     assert.equal(new Set(ids).size,ids.length,`unique IDs: ${file}`);
     for(const [,url] of html.matchAll(/(?:src|href)="([^"]+)"/g)){
       if(url.startsWith('#'))continue;
-      if(/^https:\/\//.test(url)){assert(url.startsWith('https://github.com/ZCH-czc/winplayer'),'only documented public core links');continue;}
+      if(/^https:\/\//.test(url)){assert(url.startsWith('https://github.com/ZCH-czc/winplayer')||url==='https://www.bilibili.com/video/BV1jY8t6JE9K','only public core and selected official work links');continue;}
       assert(!url.startsWith('/')&&!url.includes('://'),'project-subdirectory-compatible URL');
       const target=path.resolve(path.dirname(file),url.split(/[?#]/)[0]);
       assert(target.startsWith(root+path.sep));assert(fs.statSync(target).isFile(),`asset: ${url}`);

@@ -38,6 +38,14 @@ and explicitly identifies the current distribution as a source preview.
 The page and expanded-player backgrounds include gentle motion with pause and reduced-motion
 paths. All currently bundled tracks, artwork and lyrics are original silent fixtures.
 
+The Chinese page has an optional official Bilibili player for the owner's selected
+泠鸢yousa《羁绊环游线》(`BV1jY8t6JE9K`). No third-party frame or request is created
+until its play button is clicked. Official controls, poster and a source link remain
+visible. Closing, changing to English or leaving the page removes the frame. Bilibili
+may use its own cookies and restrict off-site playback. The Auralis UI tour remains
+independent; no song audio or cover is redistributed. The embed follows
+[Bilibili's official documentation](https://player.bilibili.com/).
+
 ## Publishing
 
 The owner-approved GitHub Pages site is built from this directory by
