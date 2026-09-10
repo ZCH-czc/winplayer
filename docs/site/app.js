@@ -6,7 +6,7 @@
     eyebrow:'以 FLUENT 为形，为你的音乐而生。',headline1:'你的音乐。',headline2:'恰如其分的归属。',
     intro1:'少一点界面，多一点感受。',intro2:'一个围绕聆听而设计的 Windows 播放器。',
     github:'在 GitHub 探索',meet:'认识你的播放器',platform:'Windows 10 / 11 · 开源 · 本地优先',
-    chapter1:'深夜唱片',chapter2:'切入晨光',chapter3:'封面主场',chapter4:'深色沉浸',chapter5:'下一首',chapter6:'歌词随心',demoNote:'真实应用 UI 动态演示 · 旋转唱片与同步演示歌词 · 静音展示',
+    chapter1:'深夜唱片',chapter2:'切入晨光',chapter3:'封面主场',chapter4:'深色沉浸',chapter5:'下一首',chapter6:'歌词随心',demoNote:'深浅色实时切换 · 其余布局与面板使用截图轮播',
     experienceEyebrow:'熟悉的感觉，全新的视角。',experienceTitle1:'各就其位。',experienceTitle2:'让音乐自在发生。',experienceIntro:'把你的收藏整理好，让正在播放的音乐始终触手可及。',
     libraryCaption:'清晰的曲库，同一个持续的播放会话。',libraryTitle:'属于你的音乐收藏。',libraryBody:'按歌曲、专辑和艺术家浏览。收藏喜欢的音乐，重温最近播放，再把心仪曲目整理成自己的歌单。',
     sessionTitle:'不打断这一刻。',sessionBody:'底部播放栏和右侧队列让下一首触手可及。自由浏览页面，同一个播放会话始终伴随。',
@@ -31,7 +31,12 @@
   let language='en',paused=false,scene=0,heroVisible=true,lyricsVisible=false,sceneTimer=null,lyricTimer=null,lyric=1;
   const words=()=>language==='zh-CN'?zh:en;
   const running=()=>!paused&&!reduce.matches&&!document.hidden;
-  function syncDemo(){if(demoReady)frame.contentWindow.postMessage({type:'auralis-demo-state',scene,language,running:running()&&heroVisible},window.location.origin);}
+  function syncDemo(){if(demoReady)frame.contentWindow.postMessage({type:'auralis-demo-state',scene:Math.min(scene,1),language,running:scene<2&&running()&&heroVisible},window.location.origin);}
+  function syncPicture(){
+    stage.dataset.presentation=scene<2?'live':'image';
+    const locale=language==='zh-CN'?'zh-CN':'en-US';
+    window.AuralisGallery.show(document.getElementById('scene-gallery'),`assets/gallery/scene-${scene}-${locale}.png`,words()[`chapter${scene+1}`]);
+  }
   function resizeDemo(){frame.style.transform=`scale(${stage.clientWidth/1280})`;}
   window.addEventListener('message',event=>{if(event.source===frame.contentWindow&&event.origin===window.location.origin&&event.data?.type==='auralis-demo-ready'){demoReady=true;resizeDemo();stage.classList.add('demo-ready');syncDemo();}});
   frame.addEventListener('load',()=>frame.contentWindow.postMessage({type:'auralis-demo-ping'},window.location.origin));
@@ -46,7 +51,7 @@
   function setScene(next){
     scene=next;
     chapters.forEach((el,i)=>{el.classList.toggle('active',i===scene);el.setAttribute('aria-pressed',String(i===scene));});
-    syncDemo();
+    syncPicture();syncDemo();
   }
   function scheduleScenes(){
     clearTimeout(sceneTimer);sceneTimer=null;
@@ -78,7 +83,7 @@
     document.getElementById('guide-link').href=`https://github.com/ZCH-czc/winplayer/blob/main/docs/USER_GUIDE.${language==='zh-CN'?'zh-CN':'en-US'}.md`;
     document.title=language==='zh-CN'?'Auralis — 你的音乐，恰如其分的归属。':'Auralis — Your music. Beautifully at home.';
     document.querySelector('meta[name="description"]').content=language==='zh-CN'?'Auralis：以 Fluent 为灵感的 Windows 音乐播放器，本地曲库、沉浸式播放、同步歌词与模块化播放组件。':'Meet Auralis: a Fluent-inspired Windows music player with a local library, immersive playback pages, synchronized lyrics and modular playback.';
-    updateMotionButton();syncDemo();
+    updateMotionButton();syncPicture();syncDemo();
     window.dispatchEvent(new Event('auralis-language-change'));
   }
   languageButton.addEventListener('click',()=>setLanguage(language==='en'?'zh-CN':'en'));
@@ -100,5 +105,5 @@
   }else{lyricsVisible=true;}
   window.addEventListener('pagehide',()=>{clearTimeout(sceneTimer);clearTimeout(lyricTimer);if(demoReady)frame.contentWindow.postMessage({type:'auralis-demo-state',scene,language,running:false},window.location.origin);});
   window.addEventListener('pageshow',updateMotion);
-  updateMotion();
+  syncPicture();updateMotion();
 })();

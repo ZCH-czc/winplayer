@@ -13,11 +13,11 @@ See [screenshot provenance](../screenshots/README.md) and
 [icon provenance](../../Auralis/Assets/README.md). Screenshots show demonstration
 content, not real audio output or measured sound quality. No audio autoplays.
 
-The hero now renders the actual public full-screen Web UI, rather than cycling still
-screenshots. Six automatic scenes show dark/light records, dark/light immersive artwork,
-the queue and lyric controls. The original 22-second record rotation and lyric clock
-are driven by original synthetic fixtures. `player/provenance.json` records the public
-source commit and hashes; `player/LICENSE` contains its MIT license.
+Six automatic scenes show dark/light records, dark/light immersive artwork, the queue
+and lyric controls. Only the dark/light pair uses live public Web UI and original
+22-second record rotation. Other scenes use a fixed-ratio screenshot carousel;
+the live clock stops while hidden. `player/provenance.json` records source hashes;
+`player/LICENSE` contains its MIT license.
 
 The presentation frame uses an in-memory preference store, a no-op native bridge and a
 CSP blocking connections and media. It does not decode or play audio. Its six scene
@@ -25,11 +25,11 @@ buttons, language control and motion control remain outside the non-interactive 
 These source resources are an explicit allowlist, not a copy of application binaries,
 user state or optional private packages. Web translucency does not demonstrate native Mica.
 
-The customization section's five accent swatches also control a still live-rendered
-settings preview. Its real application controls and embedded preview use the selected
-blue, teal, violet, coral or amber tokens. Keyboard arrow navigation and checked state
-are supported; switching language preserves the chosen color. This second frame has
-no playback clock and does not change the hero's automatic presentation.
+The customization section's five accent swatches select matching settings screenshots
+using the real blue, teal, violet, coral or amber tokens. There is no live settings
+iframe. Keyboard navigation and checked state are supported; language changes preserve
+the selection. Images load before crossfading; stale loads cannot override newer choices.
+`assets/gallery/README.md` documents the 22 bilingual captures from public synthetic data.
 
 No provider implementation, private repository link, account, analytics or external
 runtime dependency is included. The page links to the public source and user guide,
