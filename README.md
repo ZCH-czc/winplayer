@@ -3,6 +3,7 @@
 <p align="center">A Fluent-inspired Windows music player, built around listening.</p>
 <p align="center">Local library · Immersive playback pages · Synchronized lyrics · Modular playback</p>
 <p align="center"><strong>English</strong> · <a href="README.zh-CN.md">简体中文</a></p>
+<p align="center"><a href="https://zch-czc.github.io/winplayer/">Explore the interactive Auralis showcase</a></p>
 
 ![Dark record-and-lyrics player with a persistent transport bar](docs/screenshots/player-en-US.png)
 

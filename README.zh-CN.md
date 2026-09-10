@@ -3,6 +3,7 @@
 <p align="center">一款专注聆听体验的 Windows Fluent 播放器。</p>
 <p align="center">本地音乐库 · 沉浸式播放页 · 同步歌词 · 模块化播放</p>
 <p align="center"><a href="README.md">English</a> · <strong>简体中文</strong></p>
+<p align="center"><a href="https://zch-czc.github.io/winplayer/">打开 Auralis 交互宣传页</a></p>
 
 ![深色唱片与歌词播放页及常驻播放栏](docs/screenshots/player-zh-CN.png)
 
