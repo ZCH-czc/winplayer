@@ -1,0 +1,7 @@
+/* Only presentation framing/pause behavior. Player layouts and rotation are upstream. */
+html,body{overflow:hidden!important}
+#splash{display:none!important}#app{opacity:1!important;visibility:visible!important}
+.now-playing-overlay{inset:0!important;border-radius:0!important}
+body[data-demo-paused="true"] *,body[data-demo-paused="true"] *::before,body[data-demo-paused="true"] *::after{animation-play-state:paused!important;transition:none!important}
+html[data-demo-theme-change="true"] .now-playing-overlay,html[data-demo-theme-change="true"] .immersive-player,html[data-demo-theme-change="true"] .queue-panel{transition:background-color 700ms ease,color 700ms ease,border-color 700ms ease}
+@media(prefers-reduced-motion:reduce){html[data-demo-theme-change="true"] *{transition:none!important}}

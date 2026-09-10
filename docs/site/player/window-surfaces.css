@@ -1,0 +1,39 @@
+/* Shared application-owned surfaces. Windows caption buttons deliberately remain square. */
+:root { --popup-radius: 8px; --control-radius: 6px; --pill-radius: 999px; --panel-padding: 20px; --drawer-top: 48px; --drawer-bottom: 82px; }
+.modal-card, .fluent-flyout, .media-hub-dialog, .queue-panel { border-radius: var(--popup-radius); background: var(--surface-solid); }
+.modal-card :is(.secondary-button,.accent-button,.icon-button),
+.fluent-flyout button, .queue-panel .icon-button { border-radius: var(--control-radius); }
+.media-hub-dialog [data-media-action="close"] { width: 40px; height: 40px; flex: none; }
+.media-hub-dialog [data-media-action="close"] svg { width: 18px; height: 18px; }
+.media-hub-dialog[open]::backdrop { animation: surface-scrim-enter calc(180ms * var(--motion-scale)) ease both; }
+.media-hub-dialog.is-closing::backdrop { animation: surface-scrim-exit 140ms ease both; }
+@keyframes surface-scrim-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes surface-scrim-exit { from { opacity: 1; } to { opacity: 0; } }
+.saved-playlist-tabs button, .online-provider-filter { position: relative; min-height: 44px; padding: 10px 16px; border: 1px solid var(--stroke); border-radius: var(--control-radius); color: var(--text-secondary); background: var(--surface-secondary); transition: background calc(140ms * var(--motion-scale)) ease; }
+.saved-playlist-tabs button:hover, .online-provider-filter:hover { background: var(--accent-softer); }
+.saved-playlist-tabs .active, .online-provider-filter[aria-pressed="true"] { color: var(--text); background: var(--surface-solid); font-weight: 600; }
+.saved-playlist-tabs .active::after, .online-provider-filter[aria-pressed="true"]::after { content: ''; position: absolute; height: 3px; bottom: 0; left: 16px; right: 16px; border-radius: var(--pill-radius); background: var(--accent); }
+.modal-layer { transition: opacity calc(160ms * var(--motion-scale)) ease, visibility 0s linear calc(180ms * var(--motion-scale)); }
+.modal-card { transform: translateY(8px) scale(.99); transition: transform calc(180ms * var(--motion-scale)) var(--ease-out); }
+.modal-layer.open { transition-delay: 0s; }
+.fluent-flyout { transition: opacity calc(130ms * var(--motion-scale)) ease, transform calc(160ms * var(--motion-scale)) var(--ease-out); }
+@supports (backdrop-filter: blur(20px)) {
+  .modal-card, .fluent-flyout, .media-hub-dialog, .queue-panel { background: color-mix(in srgb, var(--surface-solid) 94%, transparent); backdrop-filter: blur(20px) saturate(1.15); }
+}
+/* Only become transparent after Native confirms DWM backdrop support. */
+:root[data-window-effect="mica"][data-native-mica="on"],
+:root[data-window-effect="mica"][data-native-mica="on"] :is(body,.app,.main,.sidebar,.titlebar) { background: transparent; }
+:root[data-window-effect="mica"][data-native-mica="on"] .player-bar { background: var(--surface-secondary); }
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  .modal-card, .fluent-flyout, .media-hub-dialog, .queue-panel { background: var(--surface-solid); backdrop-filter: none; }
+  :root[data-window-effect="mica"][data-native-mica="on"] .app { background: var(--background); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) :is(.modal-card,.modal-layer,.fluent-flyout) { transition: none; }
+}
+:root[data-motion="reduced"] :is(.modal-card,.modal-layer,.fluent-flyout) { transition: none !important; }
+:root[data-motion="reduced"] .media-hub-dialog::backdrop { animation: none; }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion="full"]) .media-hub-dialog::backdrop { animation: none; } }
+@media (max-width: 760px) { :root { --panel-padding: 16px; } }
+@media (max-height: 600px) { :root { --drawer-top: 40px; --drawer-bottom: 76px; } }
+[data-runtime-build] { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

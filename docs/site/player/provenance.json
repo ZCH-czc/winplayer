@@ -1,0 +1,18 @@
+{
+  "repository": "https://github.com/ZCH-czc/winplayer",
+  "commit": "03fcb523878fa5a90e804a73ed620f6ea11d677a",
+  "files": {
+    "index.html": "ff4c788b4dc6c74b188e3c1af07fdbd65e3200444a8ecc0c5e2d9e72cc3aa076",
+    "styles.css": "b22b597270e1318bc0c9f698fe51d36b4aa6c6840ffb99918a80bd44f5aa7626",
+    "i18n.js": "f1a6d3945976e78af5a743a55a3f1bdd7ca83677418d93d4c601d66e2f1edf23",
+    "lyrics-clock.js": "59b36fe47857f631c46f07db33ffadd140eb0550585c93e6233e7c12cef4f68a",
+    "media-hub.css": "e2fb44f5d3d52ea73d82e78de76b3ccb4a02fbcc2171fa464ab0a8193dc09d67",
+    "window-surfaces.css": "233bb63c8c4ff2a6df60dcd8fe765874a89dea17ba872204636f54dda4d60287",
+    "media-hub.js": "d1dadbfe08c0dfc59179d582b1200ce7246f7ad570f6993804bd7e25656e479f",
+    "search-history.js": "4f58a1e2e066e635eb7b2b927de90da8263bb98219d799f9116493bacd90897d",
+    "playback-components.js": "16789469a50d0246edbed460332b3f02505669875f7bbf559d91504f76556bb8",
+    "media-transport-components.js": "a343f2d54ed833fc0b7316b40ec7a41e1bd8e26c5d72bbb9350210ff220d2785",
+    "app.js": "7959d0227c3dfd79c707776b293d54f556879899e2ba77df23e0a4c39c15da9f",
+    "assets/public-preview.svg": "87ac7572fc44c2c5c808a3f2bd0c354dae17e974d419bbb2008d50a3462c34e3"
+  }
+}
