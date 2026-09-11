@@ -1,7 +1,7 @@
 # Auralis promotional page
 
 English-first static promotional page with a Chinese language switch and automatic,
-UI scene presentation. English remains silent; Chinese offers gesture-started music.
+UI scene presentation. Both languages use a silent visual demonstration.
 `index.html`, `styles.css`, `app.js`, `player/` and `assets/` form
 a standalone site; asset paths work under a repository subdirectory.
 
@@ -42,13 +42,11 @@ paths. English uses original silent fixtures. Chinese uses 大海带不走 by �
 with public promotional permission confirmed by the owner on 2026-09-11. See
 [media provenance](assets/dahai/README.md); third-party media is not MIT-licensed.
 
-The previous third-party featured-song embed has been removed. A self-hosted MP3 is
-played by a single parent HTML Audio element after a click. No browser contacts a music
-platform, receives a temporary lease or uses an account. The isolated presentation frame
-receives only time/duration/playback metadata; supplied LRC timestamps drive its lyrics.
-Controls support pause, seek and volume. Gallery transitions keep audio playing;
-switching to English or hiding the tab pauses it without automatic resumption.
-Reduced motion still allows explicitly requested audio while stopping decorative motion.
+The standalone Chinese song card, including its play, seek and volume controls, has
+been removed. The page does not load or play audio. The authorized media assets remain
+preserved, and the Chinese full-screen demonstration keeps its album artwork and LRC
+with a silent presentation clock. Record rotation, theme transitions and screenshot
+carousels remain; motion pauses when hidden or reduced motion is requested.
 
 ## Publishing
 

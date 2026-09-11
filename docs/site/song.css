@@ -1,9 +1,0 @@
-.song-controls{display:flex;align-items:center;flex-wrap:wrap;gap:12px 16px;margin:20px auto 0;padding:16px 20px;max-width:1050px;background:rgba(255,255,255,.75);border:1px solid rgba(30,45,65,.12);border-radius:8px;color:#252c35;backdrop-filter:blur(20px);text-align:left;font-size:14px}
-.song-controls[hidden]{display:none!important}
-.song-controls button{min-height:44px;padding:10px 16px;border:1px solid transparent;border-radius:6px;background:#356c9c;color:white;font:inherit;cursor:pointer}
-.song-controls button:hover{background:#2b5d8b}.song-controls button:focus-visible,.song-controls input:focus-visible{outline:3px solid #356c9c;outline-offset:3px}
-.song-progress{flex:1;min-width:180px}.song-progress label{display:block;margin-bottom:4px;font-weight:600}.song-progress input{width:100%}
-.song-controls input{accent-color:#356c9c;min-height:24px;cursor:pointer}.song-controls output{font-variant-numeric:tabular-nums;white-space:nowrap}.song-volume{display:flex;gap:8px;align-items:center}.song-volume input{width:85px}
-#song-status{flex-basis:100%;font-size:14px;color:#536171}
-@media(max-width:600px){.song-controls{padding:14px;gap:12px}.song-progress{order:2;flex-basis:100%}#song-status{order:3}.song-volume{margin-left:auto}}
-@media(forced-colors:active){.song-controls,.song-controls button{border:1px solid ButtonText}.song-controls button{background:ButtonFace;color:ButtonText}}

@@ -26,6 +26,9 @@ function walk(directory){for(const item of fs.readdirSync(directory,{withFileTyp
   }
 }}
 walk(root);
+const landing=fs.readFileSync(path.join(root,'index.html'),'utf8');
+assert(!/song-controls|song-seek|song-volume|song\.js|song\.css|<audio\b/.test(landing),'no standalone song card or hidden audio player');
+assert(landing.includes('id="player-demo"')&&landing.includes('id="scene-gallery"'),'preserve full-screen and carousel presentation');
 const provenance=JSON.parse(fs.readFileSync(path.join(root,'player/provenance.json')));
 for(const [file,hash] of Object.entries(provenance.files))if(file!=='index.html')assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'player',file))).digest('hex'),hash,`public UI provenance: ${file}`);
 for(const name of ['index.html','customize.html']){

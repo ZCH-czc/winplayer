@@ -31,8 +31,7 @@
   let language='en',paused=false,scene=0,heroVisible=true,lyricsVisible=false,sceneTimer=null,lyricTimer=null,lyric=1;
   const words=()=>language==='zh-CN'?zh:en;
   const running=()=>!paused&&!reduce.matches&&!document.hidden;
-  function syncDemo(){if(demoReady)frame.contentWindow.postMessage({type:'auralis-demo-state',scene:Math.min(scene,1),language,running:scene<2&&running()&&heroVisible,audio:window.AuralisFeaturedAudio?.snapshot()},window.location.origin);}
-  window.addEventListener('auralis-audio-change',syncDemo);
+  function syncDemo(){if(demoReady)frame.contentWindow.postMessage({type:'auralis-demo-state',scene:Math.min(scene,1),language,running:scene<2&&running()&&heroVisible},window.location.origin);}
   function syncPicture(){
     stage.dataset.presentation=scene<2?'live':'image';
     const locale=language==='zh-CN'?'zh-CN':'en-US';
