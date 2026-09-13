@@ -34,6 +34,7 @@ if (args.Length > 0 && string.Equals(args[0], "--lan-preview", StringComparison.
 }
 
 CommentAvatarTests.Run();
+await SpeculativeWorkTests.RunAsync();
 AudioInformationTests.Run();
 if (SingleInstanceTests.RunChild(args)) return;
 SingleInstanceTests.Run();
@@ -933,6 +934,11 @@ try
         Assert(reused.Source == prepared.Source && streamHandler.RequestCount == requestsAfterHosted,
             "同一首受限在线歌曲再次播放时应直接复用已验证缓存，不重复请求网络");
         await streamService.DiscardPreparedAsync(reused);
+        var changedLease = new PlatformStreamLease(new Uri("https://cdn.example/direct.mp3?authorization=changed"),
+            hostLease.ExpiresAt, hostLease.MimeType, quality) { UseHostTransport = true };
+        var changed = await streamService.PrepareAsync(changedLease, "fixture:host-transport", CancellationToken.None);
+        Assert(changed.Source != hosted.Source, "同一个曲目标识不能合并不同授权资源");
+        await streamService.DiscardPreparedAsync(changed);
 
         var warmed = await streamService.PrepareAsync(directLease, "next:standard", CancellationToken.None, bufferRemote: true);
         Assert(warmed.Source.IsFile && File.Exists(warmed.Source.LocalPath), "下一首预缓存必须完整准备无请求头的在线音频");

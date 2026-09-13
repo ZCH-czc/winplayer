@@ -26,7 +26,7 @@ internal sealed partial class OnlinePlatformCoordinator
         if (registration is null || _backend.IsPluginDisabled(registration.PluginId) || !registration.Provider.Capabilities.Contains(capability))
             return PlatformResult<PlatformProviderManifest>.Failure(PlatformErrorCode.Unsupported, "插件未启用或未提供此功能。");
         var settings = await _backend.ReadSettingsAsync(registration, token).ConfigureAwait(false);
-        if (settings.Any(s => s.Required && s.Value.Length == 0))
+        if (settings.Any(s => s.Enabled && s.Required && s.Value.Length == 0))
             return PlatformResult<PlatformProviderManifest>.Failure(PlatformErrorCode.ConfigurationRequired, "请先完成此插件的必填设置。");
         return PlatformResult<PlatformProviderManifest>.Success(registration.Provider);
     }

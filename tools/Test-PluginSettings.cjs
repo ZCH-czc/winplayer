@@ -33,6 +33,7 @@ const server = http.createServer(async (req,res) => {
         },postMessageWithAdditionalObjects:(m,files)=>window.testBridge({...m,testFiles:files.map(f=>f.name)})}};
       },{english:theme==='dark'});
       await page.goto(`${origin}/?ui-test=1&ui-test-theme=${theme}`);
+      await page.evaluate(scale=>{window.Auralis.setDpiScale(scale);window.Auralis.receiveLibrary([]);},scale);
       await page.locator('[data-page="settings"]').click();
       await page.locator('[data-settings-section="plugins"]').click();
       await page.waitForFunction(()=>document.querySelector('#pluginInventory[aria-busy="true"]'));
@@ -253,6 +254,82 @@ const server = http.createServer(async (req,res) => {
       assert.equal(action('dropPluginPackages').requestId,lastDrop,'excess and non-plugin drops are not imported');
       await page.evaluate(()=>{delete window.chrome.webview.postMessageWithAdditionalObjects;});
       await drop(['one.zip']);assert.equal(action('dropPluginPackages').requestId,lastDrop,'older runtime uses explicit picker fallback');
+      // Recovery uses a native picker and the existing token/trust confirmation, never a Web path.
+      const recoveryButton=page.locator('[data-plugin-recovery="fixture.0"]');
+      assert(await recoveryButton.evaluate(n=>n.getBoundingClientRect().height>=40),'recovery has a 40px hit area');
+      await recoveryButton.focus(); await page.keyboard.press('Enter');
+      assert.deepEqual(Object.keys(action('pickPluginRecovery')).sort(),['action','id','requestId']);
+      assert.equal(action('pickPluginRecovery').id,'fixture.0');
+      assert(await recoveryButton.isDisabled());
+      await management('pickPluginRecovery',{error:'recoveryUnavailable'});
+      await respond({requestId:currentRequest(),items,issues:[]});
+      assert(await recoveryButton.evaluate(n=>n===document.activeElement),'failed recovery restores focus');
+      await page.locator('#pluginImportRegion').scrollIntoViewIfNeeded();
+      assert.match(await page.locator('#pluginImportRegion').innerText(),theme==='dark'?/same plugin ID/:/同一插件 ID/);
+      await recoveryButton.click();
+      const recoveryResponse={batch:{token:'9'.repeat(32),items:[{fileName:'original-older.auralis-plugin',preview:{
+        id:'fixture.0',displayName:'Original fixture',version:'1.0.0',sha256:'E'.repeat(64),providers:['Example'],capabilities:['LyricsLookup'],
+        review:{kind:'recovery',previousVersion:'2.0.0',previousPayloadSha256:'F'.repeat(64),previousVerified:true,hostSdkVersion:'2.10.0',accessReviewRequired:true,
+          changes:[{kind:'pages',added:[],removed:['fixture / catalogue / v2']},{kind:'artworkDomains',added:['<img src=x onerror=alert(1)>'],removed:['fixture / assets.example.com']}]
+        }}}]}};
+      await management('pickPluginRecovery',recoveryResponse);
+      await respond({requestId:currentRequest(),items,issues:[]});
+      assert.equal(await page.locator('.plugin-update-review').count(),1);
+      await page.locator('.plugin-update-review').scrollIntoViewIfNeeded();
+      assert.match(await page.locator('.plugin-update-review').innerText(),theme==='dark'?/Reimport an older version/:/重新导入旧版/);
+      assert.match(await page.locator('.plugin-update-review').innerText(),theme==='dark'?/not been tested/:/尚未测试/);
+      assert(await page.locator('.plugin-review-differences').evaluate(n=>n.open),'changed access scope is expanded');
+      assert.equal(await page.locator('.plugin-update-review img').count(),0,'declaration text is escaped');
+      assert(!(await page.locator('#pluginImportTrust').isChecked()),'recovery never inherits trust');
+      assert(await page.locator('[data-action="restart-for-plugins"]').isDisabled());
+      assert(await recoveryButton.isDisabled());
+      await page.locator('#pluginImportTrust').check();
+      await page.locator('[data-action="refresh-plugins"]').click();
+      await respond({requestId:currentRequest(),items,issues:[]});
+      assert(await page.locator('#pluginImportTrust').isChecked(),'inventory-only refresh preserves approval');
+      assert(await page.locator('.plugin-review-differences').evaluate(n=>n.open),'refresh preserves disclosure');
+      const updateOutput=path.resolve(__dirname,'../artifacts/plugin-update-ui'); await fs.mkdir(updateOutput,{recursive:true});
+      await page.waitForFunction(()=>!document.querySelector('.toast'),'test notices leave before visual capture',{timeout:15000});
+      await page.locator('.plugin-update-review').scrollIntoViewIfNeeded();
+      assert(await page.locator('.plugin-update-review').evaluate(n=>n.scrollWidth<=n.clientWidth+1),'review fits high-DPI narrow card');
+      for (const mode of ['restored','maximized','fullscreen']) {
+        await page.evaluate(mode=>{window.Auralis.setWindowState(mode!=='restored');window.Auralis.setFullscreenState(mode==='fullscreen');},mode);
+        assert(await page.locator('.plugin-update-review').evaluate(n=>n.scrollWidth<=n.clientWidth+1),mode+' review bounds');
+        assert(await page.locator('[data-action="confirm-plugin-import"]').evaluate(n=>n.getBoundingClientRect().height>=40),'confirmation retains hit area');
+      }
+      await page.evaluate(()=>{window.Auralis.setWindowState(false);window.Auralis.setFullscreenState(false);});
+      await page.screenshot({path:path.join(updateOutput,`recovery-${theme}-${scale}.png`)});
+      await page.locator('[data-action="cancel-plugin-import"]').click(); await management('cancelPluginImport');
+      await respond({requestId:currentRequest(),items,issues:[]});
+      assert(await recoveryButton.evaluate(n=>n===document.activeElement),'cancel restores row focus');
+      assert.equal(await page.locator('.plugin-update-review').count(),0);
+      const beforeLate=messages.length;
+      await management('pickPluginRecovery',{batch:{token:'8'.repeat(32),items:[]}});
+      assert.equal(await page.locator('.plugin-update-review').count(),0,'late recovery cannot reopen cancelled review');
+      assert(!messages.slice(beforeLate).some(m=>['playTrack','pausePlayback','resumePlayback','setPluginEnabled','confirmPluginImport'].includes(m.action)));
+      await recoveryButton.click();
+      const delayedRequest=action('pickPluginRecovery').requestId;
+      await page.locator('[data-page="songs"]').click();
+      await management('pickPluginRecovery',recoveryResponse);
+      for(let i=0;i<30 && action('cancelPluginImport').requestId<delayedRequest;i++) await page.waitForTimeout(10);
+      assert(action('cancelPluginImport').requestId>delayedRequest,'leaving discards the delayed native preview');
+      await management('cancelPluginImport');
+      await page.locator('[data-page="settings"]').click();
+      await page.locator('[data-settings-section="plugins"]').click();
+      await page.locator('[data-action="refresh-plugins"]').click();
+      await respond({requestId:currentRequest(),items,issues:[]});
+      assert.equal(await page.locator('.plugin-update-review').count(),0,'returning does not revive abandoned approval');
+      await recoveryButton.click(); await management('pickPluginRecovery',recoveryResponse);
+      await respond({requestId:currentRequest(),items,issues:[]});
+      assert(!(await page.locator('#pluginImportTrust').isChecked()));
+      await page.locator('#pluginImportTrust').check(); await page.locator('[data-action="confirm-plugin-import"]').click();
+      assert.equal(action('confirmPluginImport').token,recoveryResponse.batch.token,'recovery uses reviewed batch token');
+      assert.equal(action('confirmPluginImport').trust,true);
+      await management('confirmPluginImport',{results:[{fileName:'original-older.auralis-plugin',id:'fixture.0'}]});
+      await respond({requestId:currentRequest(),items,issues:[]});
+      assert.match(await page.locator('.plugin-batch-results').textContent(),theme==='dark'?/disabled/i:/未启用/);
+      await page.evaluate(()=>window.Auralis.receiveLibrary([{id:'local.original',title:'Original local demo',artist:'Original fixture',album:'Demo',durationSeconds:120}]));
+      assert.equal(await page.locator('.plugin-update-review').count(),0,'populating the local library does not revive review');
       if(scale===2) await page.emulateMedia({forcedColors:'active'});
       const layout=await page.locator('.plugin-settings-card').first().evaluate(n=>({
         overflow:n.scrollWidth-n.clientWidth,

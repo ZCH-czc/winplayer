@@ -35,6 +35,52 @@ internal static class HostCompatibilityTests
             Check(found.Plugins.Count == 0 && found.Diagnostics.Any(d => d.Code == expected), "Expected safe compatibility rejection: " + expected);
         }
         var current = PlatformHostCompatibility.Current;
+        var global = (JsonObject)valid.DeepClone();
+        global["schemaVersion"]=5;
+        global["hostRequirements"]=JsonNode.Parse("""{"minimumHostSdkVersion":"2.6.0","requiredFeatures":["comment-artwork.v1","declarative-pages.v1","declarative-pages.v2","declarative-pages.v3","global-pages.v1"]}""");
+        global["providers"]=JsonNode.Parse("""[{"id":"fixture","displayName":"Fixture","capabilities":["Pages","GlobalPages"],"commentArtworkDomains":[],"pages":[{"id":"home","label":"主页","labelEn":"Home","placement":"global","presentation":"page","documentVersion":3}]}]""");
+        Check((await Discover(global)).Plugins.Single().Providers.Count==1,"Global metadata can be discovered without activation");
+        await Reject(global,PlatformPluginDiagnosticCode.HostSdkIncompatible,new(new Version(2,5,0),current.Features));
+        var missingGlobalFeature=(JsonObject)global.DeepClone();
+        missingGlobalFeature["hostRequirements"]!["requiredFeatures"]=new JsonArray("comment-artwork.v1","declarative-pages.v1","declarative-pages.v2","declarative-pages.v3");
+        await Reject(missingGlobalFeature,PlatformPluginDiagnosticCode.ManifestInvalid);
+        var missingGlobalCapability=(JsonObject)global.DeepClone();
+        missingGlobalCapability["providers"]![0]!["capabilities"]=new JsonArray("Pages");
+        await Reject(missingGlobalCapability,PlatformPluginDiagnosticCode.ManifestInvalid);
+        var badGlobalPlacement=(JsonObject)global.DeepClone();
+        badGlobalPlacement["providers"]![0]!["pages"]![0]!["presentation"]="dialog";
+        await Reject(badGlobalPlacement,PlatformPluginDiagnosticCode.ManifestInvalid);
+        var queryPage=(JsonObject)global.DeepClone();
+        queryPage["providers"]![0]!["pages"]![0]!["documentVersion"]=4;
+        await Reject(queryPage,PlatformPluginDiagnosticCode.ManifestInvalid); // v4 must declare its feature.
+        queryPage["hostRequirements"]!["minimumHostSdkVersion"]="2.7.0";
+        ((JsonArray)queryPage["hostRequirements"]!["requiredFeatures"]!).Add("declarative-pages.v4");
+        Check((await Discover(queryPage)).Plugins.Single().Providers.Count==1,"V4 query metadata stays inert");
+        var targets=(JsonObject)queryPage.DeepClone();
+        targets["providers"]![0]!["pages"]![0]!["documentVersion"]=5;
+        ((JsonArray)targets["hostRequirements"]!["requiredFeatures"]!).Add("declarative-pages.v5");
+        await Reject(targets,PlatformPluginDiagnosticCode.ManifestInvalid); // v5 cannot underdeclare the SDK floor.
+        targets["hostRequirements"]!["minimumHostSdkVersion"]="2.9.0";
+        Check((await Discover(targets)).Plugins.Single().Providers.Count==1,"V5 navigation discovery remains inert");
+        await Reject(targets,PlatformPluginDiagnosticCode.HostSdkIncompatible,new(new Version(2,8,0),current.Features));
+        await Reject(targets,PlatformPluginDiagnosticCode.HostFeatureUnsupported,
+            new(new Version(2,9,0),current.Features.Where(f=>f!="declarative-pages.v5").ToArray()));
+        var media=(JsonObject)targets.DeepClone();
+        media["providers"]![0]!["pages"]![0]!["documentVersion"]=6;
+        ((JsonArray)media["hostRequirements"]!["requiredFeatures"]!).Add("declarative-pages.v6");
+        await Reject(media,PlatformPluginDiagnosticCode.ManifestInvalid);
+        media["hostRequirements"]!["minimumHostSdkVersion"]="2.10.0";
+        Check((await Discover(media)).Plugins.Count==1,"V6 media metadata discovery is inert");
+        await Reject(media,PlatformPluginDiagnosticCode.HostSdkIncompatible,new(new Version(2,9,0),current.Features));
+        await Reject(media,PlatformPluginDiagnosticCode.HostFeatureUnsupported,
+            new(new Version(2,10,0),current.Features.Where(f=>f!="declarative-pages.v6").ToArray()));
+        ((JsonArray)media["hostRequirements"]!["requiredFeatures"]!).RemoveAt(7);
+        await Reject(media,PlatformPluginDiagnosticCode.ManifestInvalid);
+        ((JsonArray)targets["hostRequirements"]!["requiredFeatures"]!).RemoveAt(6);
+        await Reject(targets,PlatformPluginDiagnosticCode.ManifestInvalid);
+        await Reject(queryPage,PlatformPluginDiagnosticCode.HostSdkIncompatible,new(new Version(2,6,0),current.Features));
+        await Reject(queryPage,PlatformPluginDiagnosticCode.HostFeatureUnsupported,
+            new(new Version(2,7,0),current.Features.Where(f=>f!="declarative-pages.v4").ToArray()));
         var oldSdk = new PlatformHostCompatibility(new Version(1, 0, 0), current.Features);
         var noFeatures = new PlatformHostCompatibility(new Version(1, 1, 0), []);
         var oldSchema = new PlatformHostCompatibility(new Version(1, 0, 0), [], 3);

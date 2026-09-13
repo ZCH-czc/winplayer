@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   let mediaHub = null;
+  let creatorReturn = null;
   let requestedInlineVideo = '';
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -341,9 +342,9 @@
     return `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
   }
 
-  function fluentSelectMarkup(kind, value, options, ariaLabel, className = '') {
+  function fluentSelectMarkup(kind, value, options, ariaLabel, className = '', disabled = false) {
     const selected = options.find(([optionValue]) => optionValue === value) || options[0];
-    return `<button type="button" class="fluent-select-trigger ${className}" data-fluent-select="${escapeHtml(kind)}" aria-label="${escapeHtml(t(ariaLabel))}" aria-haspopup="listbox" aria-expanded="false"><span>${escapeHtml(t(selected?.[1] || value))}</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button>`;
+    return `<button type="button" class="fluent-select-trigger ${className}" ${disabled ? 'disabled' : ''} data-fluent-select="${escapeHtml(kind)}" aria-label="${escapeHtml(t(ariaLabel))}" aria-haspopup="listbox" aria-expanded="false"><span>${escapeHtml(t(selected?.[1] || value))}</span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg></button>`;
   }
 
   function fluentColorMarkup(property, value, ariaLabel) {
@@ -378,6 +379,12 @@
   function currentPlatformCapabilities(track) {
     const provider = onlineSettingsProviders.find(p => p.id === track?.providerId);
     return provider?.configured !== false ? provider?.capabilities || [] : [];
+  }
+
+  function hasCreatorPage(track) {
+    const provider=onlineSettingsProviders.find(p=>p.id===track?.providerId);
+    return provider?.configured!==false && provider?.capabilities?.includes('Pages') &&
+      provider.pages?.some(p=>p.placement==='creator');
   }
 
   function safePlatformImageUrl(value) {
@@ -666,7 +673,7 @@
     if (kind === 'language') return languageOptions();
     if (kind === 'lyricFont') return lyricFontOptions;
     if (kind === 'platformProvider') return Object.entries(platformProviders);
-    if (kind.startsWith('pluginSetting:')) return providerSettingForKind(kind)?.setting?.choices.map(c => [c.value,c.label]) || [];
+    if (kind.startsWith('pluginSetting:')) return providerSettingForKind(kind)?.setting?.choices.map(c => [c.value,providerSettingText(c,'label')]) || [];
     if (kind === 'motion') return motionOptions;
     if (kind === 'trayTimer') return trayTimerOptions;
     if (kind === 'audioModule') {
@@ -1126,6 +1133,7 @@
       }
       return;
     }
+    if (state.currentPage === 'settings' && state.settingsSection === 'plugins') leavePluginImportReview();
     settingsNavigationToken += 1;
     settingsTransitionInProgress = false;
     settingsRenderPending = false;
@@ -1140,14 +1148,14 @@
     if (page === 'settings') state.settingsSection = 'home';
     const navigationPage = page === 'onlineCollection'
       ? 'onlinePlaylists'
-      : page;
+      : ['creator','plugin'].includes(page) ? creatorReturn?.page : page;
     $$('.nav-item[data-page]').forEach(button => button.classList.toggle('active', button.dataset.page === navigationPage));
-    $('#sidebarSearchButton').classList.toggle('active', page === 'search');
+    $('#sidebarSearchButton').classList.toggle('active', navigationPage === 'search');
     $('.main').classList.toggle('search-mode', page === 'search');
     if (page !== 'search') {
       $('.topbar').classList.remove('open');
       $('#searchInput').blur();
-      if (leavingSearch) {
+      if (leavingSearch && !['creator','plugin'].includes(page)) {
         cancelPlatformSearch(true);
         state.query = '';
         $('#searchInput').value = '';
@@ -1156,7 +1164,7 @@
     }
     const existing = $('.page-view', pageContent);
     clearTimeout(pageTransitionTimer);
-    if (existing && !isMotionReduced()) {
+    if (existing && !isMotionReduced() && !options.immediate) {
       existing.classList.add('is-leaving', pageMotionDirection === 'backward' ? 'to-right' : 'to-left');
       pageTransitionTimer = setTimeout(renderPage, 145);
     } else {
@@ -1170,6 +1178,7 @@
       ? section
       : 'home';
     if (nextSection === state.settingsSection) return;
+    if (state.settingsSection === 'plugins') leavePluginImportReview();
     if (nextSection !== 'lan') lanPairingLinkVisible = false;
 
     closeFluentFlyout();
@@ -1220,6 +1229,8 @@
       albums: renderAlbums,
       artists: renderArtists,
       search: renderSearch,
+      creator: () => mediaHub?.renderCreator(),
+      plugin: () => mediaHub?.renderPluginPage(),
       onlinePlaylists: renderOnlinePlaylists,
       onlineCollection: renderOnlineCollection,
       savedPlaylists: () => mediaHub?.render(),
@@ -1299,16 +1310,17 @@
     const capabilities = currentPlatformCapabilities(track);
     const commentsAction = capabilities.includes('Comments')
       ? `<button class="row-action" data-media-action="track-comments" data-id="${escapeHtml(track.handle)}" aria-label="查看评论" title="查看评论">☷</button>` : '';
+    const creatorAction = (hasCreatorPage(track) || capabilities.includes('CreatorFeed') || capabilities.includes('CreatorProfile')) ? `<button class="row-action creator-compact" data-media-action="track-creator" data-id="${escapeHtml(track.handle)}" aria-label="${t('作者主页')} · ${escapeHtml(track.artist)}" title="${t('作者主页')} · ${escapeHtml(track.artist)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg></button>` : '';
     const videoAction = track.hasMusicVideo && capabilities.includes('VideoResolution')
       ? `<button class="platform-mv-button ${videoPending ? 'is-loading' : ''}" data-platform-mv-handle="${escapeHtml(track.handle)}" aria-label="播放 ${escapeHtml(track.title)} 的${videoLabel}" title="全屏播放器内播放视频" ${videoPending ? 'disabled' : ''}><span class="platform-mv-icon">${icon('video')}</span><span class="platform-mv-label">${videoLabel}</span><span class="platform-mv-spinner"></span></button>`
       : '<span class="platform-mv-placeholder" aria-hidden="true">—</span>';
     return `<div class="track-row platform-track-row platform-track-grid ${pending ? 'is-loading' : ''} ${track.unavailable ? 'is-unavailable' : ''}" data-track-id="${escapeHtml(track.id)}" data-platform-play-row="${escapeHtml(track.handle)}" tabindex="${track.unavailable ? '-1' : '0'}" role="button" aria-label="${pending ? t('正在准备音频…') : t('播放')} ${escapeHtml(track.title)}" aria-busy="${pending}" aria-disabled="${track.unavailable ? 'true' : 'false'}">
       <div class="track-index-cell"><span class="track-number">${String(index + 1).padStart(2, '0')}</span><button class="row-play" data-platform-play-handle="${escapeHtml(track.handle)}" aria-label="播放 ${escapeHtml(track.title)}" ${track.unavailable || pending ? 'disabled' : ''}><span class="row-play-icon">${icon('play')}</span><span class="row-pause-icon">${icon('pause')}</span><span class="platform-row-spinner"></span></button></div>
       <div class="track-title-cell"><div class="row-cover" style="${coverStyle(track)}">${track.coverUrl ? '' : escapeHtml(track.title.charAt(0).toUpperCase())}</div><div class="title-stack"><strong>${escapeHtml(track.title)}</strong><span>${trackHint}</span></div></div>
-      <span class="track-cell">${escapeHtml(track.artist)}</span><span class="track-cell">${escapeHtml(track.album)}</span>
+      <span class="track-cell">${(hasCreatorPage(track) || capabilities.includes('CreatorFeed') || capabilities.includes('CreatorProfile')) ? `<button class="creator-link" data-media-action="track-creator" data-id="${escapeHtml(track.handle)}" title="${t('作者主页')}" data-i18n-skip>${escapeHtml(track.artist)}</button>` : escapeHtml(track.artist)}</span><span class="track-cell">${escapeHtml(track.album)}</span>
       <span class="duration-cell">${formatTime(track.durationSeconds)}</span>
       <span class="provider-badge provider-${escapeHtml(track.providerId)} ${track.unavailable ? 'unavailable' : ''}">${escapeHtml(availability)}</span>
-      <span class="platform-mv-cell"><button class="row-action" data-media-action="save" data-id="${escapeHtml(track.handle)}" aria-label="加入歌单" title="加入歌单">${icon('plus')}</button>${commentsAction}${videoAction}</span>
+      <span class="platform-mv-cell"><button class="row-action" data-media-action="save" data-id="${escapeHtml(track.handle)}" aria-label="加入歌单" title="加入歌单">${icon('plus')}</button>${creatorAction}${commentsAction}${videoAction}</span>
     </div>`;
   }
 
@@ -1545,9 +1557,11 @@
       <header class="page-header search-page-header"><div><h1>“${escapeHtml(state.query)}”</h1><p>本机 ${matchedTracks.length} 首 · 在线结果与本地库保持分离</p></div><div class="page-actions">${matchedTracks.length ? `<button class="accent-button" data-action="play-all" data-first-id="${matchedTracks[0].id}">${icon('play')} 播放本地结果</button>` : ''}</div></header>
       <section class="search-section"><div class="section-title-row"><h2>本机歌曲</h2><span>${matchedTracks.length} 首</span></div>${localBody}</section>
       ${platformSearchSectionMarkup()}
+      <section id="creatorSearchSection" class="search-section" hidden></section>
       ${albums.length ? `<section class="search-section"><div class="section-title-row"><h2>本机专辑</h2><span>${localizedCount('album', albums.length)}</span></div><div class="search-card-grid">${albums.slice(0, 6).map(([album, tracks]) => `<article class="media-card" data-play-id="${tracks[0].id}" tabindex="0" role="button" aria-label="播放专辑 ${escapeHtml(album)}"><div class="media-card-cover" style="${coverStyle(tracks[0])}">${tracks[0].coverUrl ? '' : `<span class="cover-letter">${escapeHtml(album.charAt(0).toUpperCase())}</span>`}<button class="card-play" aria-label="播放专辑 ${escapeHtml(album)}">${icon('play')}</button></div><strong>${escapeHtml(album)}</strong><span>${localizedCount('song', tracks.length)}</span></article>`).join('')}</div></section>` : ''}
       ${artists.length ? `<section class="search-section"><div class="section-title-row"><h2>本机艺术家</h2><span>${artists.length} 位</span></div><div class="search-artist-grid">${artists.slice(0, 8).map(([artist, tracks]) => `<article class="search-artist-result" data-play-id="${tracks[0].id}" tabindex="0" role="button" aria-label="播放艺术家 ${escapeHtml(artist)}">${artistAvatarMarkup(artist, tracks, true)}<div><strong>${escapeHtml(artist)}</strong><span>${tracks.length} 首匹配歌曲</span></div>${icon('play')}</article>`).join('')}</div></section>` : ''}
     </div>`;
+    mediaHub?.renderCreatorSearch();
   }
 
   function mediaCard(track) {
@@ -1624,12 +1638,16 @@
 
   const providerSettingsSave = { sequence:0, pending:null, timer:0 };
   const providerSettingDrafts = new Map();
+  const providerSettingText = (item, key) => String((document.documentElement.lang.startsWith('en') && item?.[key + 'En']) || item?.[key] || '');
+  const providerSettingEnabled = (setting, provider) => setting.enabled !== false && (!setting.when ||
+    provider.settings.some(s => s.key === setting.when.key && s.kind === 'choice' && !s.when && s.value === setting.when.value));
   const providerSettingDefinition = setting => JSON.stringify([setting.kind, !!setting.required,
-    setting.kind === 'choice' ? setting.choices.map(choice => choice.value) : []]);
+    setting.kind === 'choice' ? setting.choices.map(choice => choice.value) : [],
+    setting.enabled !== false, setting.when?.key || '', setting.when?.value || '']);
   function saveProviderSetting(providerId, key, value) {
     const provider = onlineSettingsProviders.find(p => p.id === providerId);
     const setting = provider?.settings.find(s => s.key === key);
-    if (!setting || providerSettingsSave.pending || typeof value !== 'string' || value.length > 2048) return;
+    if (!setting || !providerSettingEnabled(setting, provider) || providerSettingsSave.pending || typeof value !== 'string' || value.length > 2048) return;
     const requestId = ++providerSettingsSave.sequence;
     const definition = providerSettingDefinition(setting);
     providerSettingDrafts.set(providerId + ':' + key, {value,definition,error:''});
@@ -1648,14 +1666,29 @@
 
   function platformSettingsMarkup() {
     const accounts = onlineSettingsProviders.filter(p => p.capabilities.includes('Authentication'));
-    const rows = onlineSettingsProviders.flatMap(p => p.settings.map(s => {
+    const settingRow = (p, s) => {
       const draft = providerSettingDrafts.get(p.id + ':' + s.key);
       const displayValue = draft?.value ?? s.value;
+      const enabled = providerSettingEnabled(s, p), disabled = !enabled || !!providerSettingsSave.pending;
+      const label = providerSettingText(s, 'label'), description = providerSettingText(s, 'description');
+      const hint = !enabled ? providerSettingText(s.when, 'hint') : '';
       const control = s.kind === 'choice'
-        ? fluentSelectMarkup('pluginSetting:' + p.id + ':' + s.key, displayValue, s.choices.map(c => [c.value,c.label]), s.label)
-        : `<div class="plugin-endpoint-control"><input class="setting-text-input" data-provider-setting-input="${escapeHtml(s.key)}" data-provider-id="${escapeHtml(p.id)}" aria-label="${escapeHtml(s.label)}" type="url" autocomplete="off" maxlength="2048" value="${escapeHtml(displayValue)}"><button class="secondary-button" data-action="save-provider-setting" data-provider-id="${escapeHtml(p.id)}" data-setting-key="${escapeHtml(s.key)}" ${providerSettingsSave.pending ? 'disabled' : ''}>${t('保存')}</button></div>`;
-      return `<div class="setting-row" data-declared-setting="${escapeHtml(s.key)}"><div class="setting-label" data-i18n-skip><strong>${escapeHtml(p.name)} · ${escapeHtml(s.label)}</strong><span>${escapeHtml(s.description)}</span>${draft?.error ? `<span role="status">${escapeHtml(draft.error)}</span>` : ''}</div>${control}</div>`;
-    })).join('');
+        ? fluentSelectMarkup('pluginSetting:' + p.id + ':' + s.key, displayValue, s.choices.map(c => [c.value,providerSettingText(c,'label')]), label, '', disabled)
+        : `<div class="plugin-endpoint-control"><input class="setting-text-input" data-provider-setting-input="${escapeHtml(s.key)}" data-provider-id="${escapeHtml(p.id)}" aria-label="${escapeHtml(label)}" type="url" autocomplete="off" maxlength="2048" value="${escapeHtml(displayValue)}" ${disabled ? 'disabled' : ''}><button class="secondary-button" data-action="save-provider-setting" data-provider-id="${escapeHtml(p.id)}" data-setting-key="${escapeHtml(s.key)}" ${disabled ? 'disabled' : ''}>${t('保存')}</button></div>`;
+      const hintId = 'plugin-setting-hint-' + p.id + '-' + s.key;
+      return `<div class="setting-row" data-declared-setting="${escapeHtml(s.key)}" data-setting-enabled="${enabled}"><div class="setting-label" data-i18n-skip><strong>${s.group ? '' : escapeHtml(p.name) + ' · '}${escapeHtml(label)}</strong><span>${escapeHtml(description)}</span>${hint ? `<span class="plugin-setting-hint" id="${escapeHtml(hintId)}">${escapeHtml(hint)}</span>` : ''}${draft?.error ? `<span role="status">${escapeHtml(draft.error)}</span>` : ''}</div><div class="plugin-setting-control" data-i18n-skip ${hint ? `role="group" aria-describedby="${escapeHtml(hintId)}" aria-label="${escapeHtml(label)}"` : ''}>${control}</div></div>`;
+    };
+    const rows = onlineSettingsProviders.map(p => {
+      const groups = new Map();
+      for (const s of p.settings) {
+        const id = s.group?.id || '';
+        if (!groups.has(id)) groups.set(id, {group:s.group, settings:[]});
+        groups.get(id).settings.push(s);
+      }
+      return [...groups.values()].map(({group,settings}) => group
+        ? `<section class="plugin-setting-group" data-plugin-setting-group="${escapeHtml(group.id)}" aria-label="${escapeHtml(providerSettingText(group,'label'))}"><header data-i18n-skip><h3>${escapeHtml(p.name)} · ${escapeHtml(providerSettingText(group,'label'))}</h3><p>${escapeHtml(providerSettingText(group,'description'))}</p></header>${settings.map(s=>settingRow(p,s)).join('')}</section>`
+        : settings.map(s=>settingRow(p,s)).join('')).join('');
+    }).join('');
     const present = accounts.length || rows || Object.keys(platformProviders).length;
     return `<section class="settings-card" data-settings-group="online"><div class="settings-card-header"><h2>${t('在线音乐')}</h2></div>
       ${accounts.map(onlinePlaylistProviderMarkup).join('')}${rows}
@@ -1722,6 +1755,13 @@
   const pluginInventory = { loaded: false, pending: false, error: false, items: [], issues: [], requestId: 0, timer: null };
   let advancedComponentsExpanded = false;
   const pluginManagement = { requestId: 0, pending: false, action: '', preview: null, results: [], error: '', notice: '', timer: null, focusId: '', cleanupFailures: new Map() };
+  function leavePluginImportReview() {
+    const m = pluginManagement;
+    m.recoveryFocusId = '';
+    if (m.pending && ['pickPluginPackage','pickPluginRecovery','dropPluginPackages'].includes(m.action)) m.discardPreview = true;
+    else if (!m.pending && m.preview) { m.preview = null; requestPluginManagement('cancelPluginImport'); }
+    // Submitted confirmation may already commit. Never claim navigation rolled it back.
+  }
   const pluginCompatibilityText = code => ({manifestUpgradeRequired:'此插件使用旧清单，不能在当前播放器中启用。请导入同一插件 ID 的新版包，确认后启用并重启；已有收藏、设置和账号数据会保留。',hostSdkIncompatible:'插件需要更新的播放器 SDK，请更新播放器后重试。',hostFeatureUnsupported:'播放器缺少插件必需的功能，请更新播放器或选择兼容的插件版本。',hostApiIncompatible:'插件接口版本与播放器不兼容，请选择匹配的版本。',manifestSchemaUnsupported:'播放器不支持此插件清单版本，请更新播放器或选择兼容包。'})[code] || '';
   const pluginImportError = code => t(pluginCompatibilityText(code) || ({ duplicatePlugin: '同批插件 ID 重复，请只保留一个版本。', batchLimit: '超过批次大小限制。', invalidPackage: '文件无效、已变化或不兼容，未导入。' })[code] || '文件无效、已变化或不兼容，未导入。');
   const pluginValidCount = () => pluginManagement.preview?.items.filter(row => row.preview && !row.error).length || 0;
@@ -1730,7 +1770,7 @@
   function pluginInventoryMarkup() {
     const p = pluginInventory;
     return `<div class="plugin-inventory-status" role="status">${p.pending ? escapeHtml(t('正在检查插件…')) : p.error ? escapeHtml(t('无法读取插件状态，请重试')) : escapeHtml(t('检查仅读取清单与文件，不登录账号或访问平台网络'))}</div>
-      ${p.items.length ? `<ul class="plugin-inventory-list">${p.items.map(item => `<li class="setting-row plugin-inventory-row"><div class="setting-label" data-i18n-skip><strong>${escapeHtml(item.displayName)}</strong><span>${escapeHtml(item.providers.join(' · '))}</span><small>${escapeHtml(item.id)} · ${escapeHtml(item.version)}</small>${item.compatibilityIssue ? `<span class="plugin-compatibility-note">${escapeHtml(t(pluginCompatibilityText(item.compatibilityIssue)))}</span>` : ''} </div><div class="plugin-row-actions"><span class="plugin-state" data-state="${Object.hasOwn(pluginStateLabels, item.state) ? item.state : 'unavailable'}">${escapeHtml(t(pluginStateLabels[item.state] || pluginStateLabels.unavailable))}</span><button type="button" class="switch ${item.enabled ? 'on' : ''}" role="switch" data-plugin-enable="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('启用插件'))} ${escapeHtml(item.displayName)}" aria-checked="${!!item.enabled}" ${pluginManagement.pending || p.pending || (!item.canEnable && !item.enabled) ? 'disabled' : ''}></button></div></li>`).join('')}</ul>` : p.loaded && !p.error ? `<div class="plugin-inventory-empty"><strong>${escapeHtml(t('尚未发现平台插件'))}</strong><p>${escapeHtml(t('本地音乐、歌单和播放不受影响；在线收藏条目会保留。'))}</p></div>` : ''}
+      ${p.items.length ? `<ul class="plugin-inventory-list">${p.items.map(item => `<li class="setting-row plugin-inventory-row"><div class="setting-label" data-i18n-skip><strong>${escapeHtml(item.displayName)}</strong><span>${escapeHtml(item.providers.join(' · '))}</span><small>${escapeHtml(item.id)} · ${escapeHtml(item.version)}</small>${item.compatibilityIssue ? `<span class="plugin-compatibility-note">${escapeHtml(t(pluginCompatibilityText(item.compatibilityIssue)))}</span>` : ''} </div><div class="plugin-row-actions"><span class="plugin-state" data-state="${Object.hasOwn(pluginStateLabels, item.state) ? item.state : 'unavailable'}">${escapeHtml(t(pluginStateLabels[item.state] || pluginStateLabels.unavailable))}</span><button type="button" class="secondary-button" data-plugin-recovery="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('选择旧版包'))} ${escapeHtml(item.displayName)}" ${pluginManagement.pending || pluginManagement.preview || p.pending || !item.canEnable ? 'disabled' : ''}>${escapeHtml(t('选择旧版包'))}</button><button type="button" class="switch ${item.enabled ? 'on' : ''}" role="switch" data-plugin-enable="${escapeHtml(item.id)}" aria-label="${escapeHtml(t('启用插件'))} ${escapeHtml(item.displayName)}" aria-checked="${!!item.enabled}" ${pluginManagement.pending || pluginManagement.preview || p.pending || (!item.canEnable && !item.enabled) ? 'disabled' : ''}></button></div></li>`).join('')}</ul>` : p.loaded && !p.error ? `<div class="plugin-inventory-empty"><strong>${escapeHtml(t('尚未发现平台插件'))}</strong><p>${escapeHtml(t('本地音乐、歌单和播放不受影响；在线收藏条目会保留。'))}</p></div>` : ''}
       ${p.issues.length ? `<div class="plugin-inventory-warning" role="status">${escapeHtml(t('部分插件无法识别，请检查版本、重复安装或损坏文件。'))}</div>` : ''}`;
   }
   function updatePluginInventoryView() {
@@ -1744,6 +1784,10 @@
       $$('[data-plugin-enable]').find(b => b.dataset.pluginEnable === pluginManagement.focusId)?.focus({preventScroll:true});
       pluginManagement.focusId = '';
     }
+    if (!pluginInventory.pending && !pluginManagement.pending && !pluginManagement.preview && pluginManagement.recoveryFocusId) {
+      $$('[data-plugin-recovery]').find(b => b.dataset.pluginRecovery === pluginManagement.recoveryFocusId)?.focus({preventScroll:true});
+      pluginManagement.recoveryFocusId = '';
+    }
   }
   function pluginImportMarkup() {
     const m = pluginManagement, p = m.preview;
@@ -1753,14 +1797,19 @@
       ${m.results.length ? `<ul class="plugin-batch-results">${m.results.map(row => `<li><span data-i18n-skip>${escapeHtml(row.fileName)}</span><span>${escapeHtml(row.error ? pluginImportError(row.error) : t('已导入 · 未启用'))}</span></li>`).join('')}</ul>` : ''}
       ${p ? `<section class="plugin-import-review" aria-label="${escapeHtml(t('确认导入插件'))}"><h3>${escapeHtml(t('确认导入插件'))} · ${pluginValidCount()} / ${p.items.length}</h3>
         <p>${escapeHtml(t('仅导入下方校验通过的插件；错误项不会安装。'))}</p>
-        <ul class="plugin-batch-list">${p.items.map(row => `<li class="plugin-batch-item"><div class="plugin-batch-heading"><strong data-i18n-skip>${escapeHtml(row.fileName || row.preview?.displayName)}</strong><span>${escapeHtml(row.error ? pluginImportError(row.error) : t('待确认'))}</span></div>${row.preview ? `<div data-i18n-skip><p>${escapeHtml(row.preview.displayName)} · ${escapeHtml(row.preview.version)}</p><p>${escapeHtml(row.preview.id)} · ${escapeHtml(row.preview.providers.join(' · '))}</p></div><details><summary>${escapeHtml(t('查看声明能力和 SHA-256'))}</summary><p data-i18n-skip>${escapeHtml(row.preview.capabilities.join(' · '))}</p>${row.preview.hostRequirements ? `<p class="plugin-host-requirements">${escapeHtml(t('最低播放器 SDK'))}: <span data-i18n-skip>${escapeHtml(row.preview.hostRequirements.minimumHostSdkVersion)}</span><br>${escapeHtml(t('必需宿主功能'))}: <span data-i18n-skip>${escapeHtml(row.preview.hostRequirements.requiredFeatures.join(' · '))}</span></p>` : ''}<code class="plugin-package-hash">${escapeHtml(row.preview.sha256)}</code></details>` : ''}</li>`).join('')}</ul>
+        <ul class="plugin-batch-list">${p.items.map(row => `<li class="plugin-batch-item"><div class="plugin-batch-heading"><strong data-i18n-skip>${escapeHtml(row.fileName || row.preview?.displayName)}</strong><span>${escapeHtml(row.error ? pluginImportError(row.error) : t('待确认'))}</span></div>${row.preview ? `<div data-i18n-skip><p>${escapeHtml(row.preview.displayName)} · ${escapeHtml(row.preview.version)}</p><p>${escapeHtml(row.preview.id)} · ${escapeHtml(row.preview.providers.join(' · '))}</p></div><details><summary>${escapeHtml(t('查看声明能力和 SHA-256'))}</summary><p data-i18n-skip>${escapeHtml(row.preview.capabilities.join(' · '))}</p>${row.preview.hostRequirements ? `<p class="plugin-host-requirements">${escapeHtml(t('最低播放器 SDK'))}: <span data-i18n-skip>${escapeHtml(row.preview.hostRequirements.minimumHostSdkVersion)}</span><br>${escapeHtml(t('必需宿主功能'))}: <span data-i18n-skip>${escapeHtml(row.preview.hostRequirements.requiredFeatures.join(' · '))}</span></p>` : ''}<code class="plugin-package-hash">${escapeHtml(row.preview.sha256)}</code></details>${window.AuralisPluginUpdateReview?.markup(row.preview.review, {t,escapeHtml,candidateVersion:row.preview.version}) || ''} ` : ''}</li>`).join('')}</ul>
         ${p.items.some(row => row.preview?.credentialAliases?.length) ? `<section class="plugin-credential-review" aria-label="${escapeHtml(t('旧账号兼容访问'))}"><h4>${escapeHtml(t('旧账号兼容访问'))}</h4><p>${escapeHtml(t('以下插件请求访问列出的旧凭据地址，以保留登录并支持刷新和退出。这里只显示地址，不显示 Cookie 或令牌；不信任时请取消导入。'))}</p><ul>${p.items.filter(row => row.preview?.credentialAliases?.length).map(row => `<li><strong data-i18n-skip>${escapeHtml(row.preview.displayName)}</strong><ul>${row.preview.credentialAliases.map(a => `<li data-i18n-skip><code>${escapeHtml(a.key)}</code> → <code>${escapeHtml(a.scope)} / ${escapeHtml(a.legacyKey)}</code></li>`).join('')}</ul></li>`).join('')}</ul></section>` : ''}
         <label class="plugin-trust-choice"><input type="checkbox" id="pluginImportTrust" ${m.pending || !pluginValidCount() ? 'disabled' : ''}><span>${escapeHtml(t('我信任本批次所有有效插件的来源，了解它们将在播放器进程内运行。'))}${p.items.some(row => row.preview?.credentialAliases?.length) ? ` ${escapeHtml(t('同时批准上面列出的旧账号兼容访问。'))}` : ''}</span></label>
         <div class="plugin-import-actions"><button type="button" class="secondary-button" data-action="cancel-plugin-import" ${m.pending ? 'disabled' : ''}>${escapeHtml(t('取消'))}</button><button type="button" class="accent-button" data-action="confirm-plugin-import" disabled>${escapeHtml(t('确认导入'))}</button></div></section>` : ''}`;
   }
   function updatePluginManagementView() {
     const region = $('#pluginImportRegion');
-    if (region) region.innerHTML = pluginImportMarkup();
+    const markup = pluginImportMarkup();
+    const token = pluginManagement.preview?.token || '';
+    // Inventory-only refresh preserves disclosure and trust; new tokens/operations reset approval.
+    if (region && (region._pluginMarkup !== markup || region._pluginToken !== token)) {
+      region.innerHTML = markup; region._pluginMarkup = markup; region._pluginToken = token;
+    }
     const picker = $('[data-action="import-plugin"]');
     if (picker) picker.disabled = pluginManagement.pending || !!pluginManagement.preview;
     updatePluginInventoryView();
@@ -1769,13 +1818,17 @@
     if (window.AuralisPlaybackComponents?.isBusy() || window.AuralisMediaTransportComponents?.isBusy()) { showToast(t('请先完成或取消当前插件导入。')); return; }
     if (pluginManagement.pending) return;
     pluginManagement.pending = true; pluginManagement.action = action;
+    if (['pickPluginPackage','pickPluginRecovery','dropPluginPackages'].includes(action)) {
+      pluginManagement.discardPreview = false;
+      pluginManagement.navigationToken = settingsNavigationToken;
+    }
     if (action === 'setPluginEnabled') pluginManagement.lastPluginId = payload.id;
     pluginManagement.error = ''; pluginManagement.notice = ''; pluginManagement.results = [];
     const requestId = ++pluginManagement.requestId;
     updatePluginManagementView();
     clearTimeout(pluginManagement.timer);
     // A native file picker may remain open while the user decides; don't permit overlapping requests.
-    if (action !== 'pickPluginPackage') pluginManagement.timer = setTimeout(() => {
+    if (!['pickPluginPackage','pickPluginRecovery'].includes(action)) pluginManagement.timer = setTimeout(() => {
       if (pluginManagement.pending && pluginManagement.requestId === requestId) {
         pluginManagement.pending = false;
         pluginManagement.error = '操作未确认，请刷新状态后重试。';
@@ -2629,7 +2682,10 @@
 
   function togglePlayback() {
     if (!state.currentTrackId) {
-      if (state.tracks.length) playTrackById(state.tracks[0].id);
+      const queue = activePlaybackQueue(), first = queue[0];
+      if (first && state.queueKind === 'mixed') playMixedItem(first, queue);
+      else if (first?.kind === 'online') requestPlatformPlayback(first, queue);
+      else if (first) playTrackById(first.id);
       else showToast('请先添加一些本地音乐');
       return;
     }
@@ -2655,7 +2711,13 @@
   }
 
   function syncNextPrefetch() {
-    if (state.platformPlayback.pendingHandle || !state.currentTrackId) return;
+    if (!state.currentTrackId) return;
+    if (state.platformPlayback.pendingHandle && prefetchSignature.endsWith('|' + state.platformPlayback.pendingHandle)) return;
+    const ended = state.duration > 0 && state.currentTime >= state.duration - .25;
+    if (state.platformPlayback.pendingHandle || (!state.isPlaying && !ended)) {
+      if (prefetchSignature) { prefetchSignature = ''; nativePost('prefetchPlatformTrack', {currentId:state.currentTrackId,handle:''}); }
+      return;
+    }
     const queue = activePlaybackQueue();
     const index = queue.length ? plannedNextIndex(queue) : -1;
     const track = queue[index];
@@ -3403,6 +3465,10 @@
     if (target.dataset.action === 'open-plugin-folder') nativePost('openPluginFolder');
     if (target.dataset.action === 'refresh-plugins') requestPluginInventory();
     if (target.dataset.action === 'import-plugin') requestPluginManagement('pickPluginPackage');
+    if (target.dataset.pluginRecovery && !pluginManagement.preview) {
+      pluginManagement.recoveryFocusId = target.dataset.pluginRecovery;
+      requestPluginManagement('pickPluginRecovery', {id:target.dataset.pluginRecovery});
+    }
     if (target.dataset.action === 'cancel-plugin-import') requestPluginManagement('cancelPluginImport');
     if (target.dataset.action === 'confirm-plugin-import' && $('#pluginImportTrust')?.checked && pluginManagement.preview)
       requestPluginManagement('confirmPluginImport', { token: pluginManagement.preview.token, trust: true });
@@ -4077,6 +4143,27 @@
     if (state.theme === 'system') applyTheme('system');
   });
 
+  // Page metadata is inert. Only explicit host-owned card buttons call this.
+  function selectPageMedia(track, play = false) {
+    if (!track || track.kind !== 'online' || track.unavailable || !currentPlatformCapabilities(track).includes('StreamResolution')) return;
+    const existing = state.currentTrackId || state.queueKind === 'mixed' ? activePlaybackQueue() : [];
+    const append = queue => queue.some(item => item.id === track.id) ? [...queue] : [...queue, track];
+    if (existing.length >= 1000 && !existing.some(item => item.id === track.id)) { showToast('播放队列已满'); return; }
+    const queue = append(existing);
+    if (play) { requestPlatformPlayback(track, queue, 'mixed'); return; }
+    const pending = state.platformPlayback;
+    if (pending.pendingHandle) {
+      if (pending.pendingQueue.length >= 1000 && !pending.pendingQueue.some(item => item.id === track.id)) { showToast('播放队列已满'); return; }
+      pending.pendingQueue = append(pending.pendingQueue);
+      pending.pendingQueueKind = 'mixed';
+    }
+    const duplicate = existing.some(item => item.id === track.id);
+    state.queueKind = 'mixed'; state.mixedQueue = queue;
+    state.currentIndex = state.currentTrackId ? Math.max(0, queue.findIndex(item => item.id === state.currentTrackId)) : -1;
+    renderQueue(); syncNextPrefetch();
+    showToast(duplicate ? '已在播放队列中' : '已加入播放队列');
+  }
+
   function playMixedItem(track, queue) {
     if (!track || track.unavailable) return;
     if (track.id === state.currentTrackId) {
@@ -4090,8 +4177,31 @@
   mediaHub = window.AuralisMediaHub.create({ state, escape: escapeHtml, post: nativePost,
     current: currentPlaybackItem, time: () => lyricsClock.read(performance.now()), advancing: () => lyricsClock.isAdvancing(performance.now()), reduced: isMotionReduced,
     normalize: normalizePlatformTrack, content: pageContent, formatTime, coverStyle,
-    providerName: platformDisplayName, toast: showToast, play: playMixedItem,
+    providerName: platformDisplayName, toast: showToast, play: playMixedItem, selectPageMedia,
+    enterCreatorPage: (route='creator') => {
+      const focused=document.activeElement;
+      if(!['creator','plugin'].includes(state.currentPage))creatorReturn={page:state.currentPage,scroll:pageContent.scrollTop,dataset:{...focused?.dataset},searchOpen:$('.topbar').classList.contains('open')};
+      setPage(route,{immediate:true});
+      toggleNowPlaying(false);
+      requestAnimationFrame(()=>document.getElementById(route==='plugin'?'pluginPageTitle':'creatorFeedTitle')?.focus({preventScroll:true}));
+    },
+    leaveCreatorPage: () => {
+      if(!['creator','plugin'].includes(state.currentPage))return;
+      const previous=creatorReturn || {page:'search',scroll:0,dataset:{}};
+      setPage(previous.page,{force:true});
+      if(previous.page==='search'&&previous.searchOpen)$('.topbar').classList.add('open');
+      setTimeout(()=>{
+        if(state.currentPage!==previous.page)return;
+        pageContent.scrollTop=previous.scroll;
+        const keys=Object.keys(previous.dataset);
+        const target=keys.length?[...pageContent.querySelectorAll('button'),...document.querySelectorAll('.sidebar button')].find(b=>b.getClientRects().length&&keys.every(k=>b.dataset[k]===previous.dataset[k])):null;
+        (target||$('#sidebarSearchButton')).focus({preventScroll:true});
+      },isMotionReduced()?0:180);
+    },
     capabilities: currentPlatformCapabilities,
+    pageProviders: () => onlineSettingsProviders.map(p=>({providerId:p.id,name:p.name})),
+    pageEntries: track => onlineSettingsProviders.find(p=>p.id===track?.providerId)?.pages || [],
+    pageContext: track => { const p=onlineSettingsProviders.find(p=>p.id===track?.providerId); return JSON.stringify([p?.pageRevision,p?.settings,p?.configured,state.platformConfiguration[p?.authenticationKey]]); },
     metadataChanged: handle => {
       if (currentPlaybackItem()?.handle === handle) { updateTrackDetails(currentPlaybackItem(), true); syncPlaybackUi(); }
       renderQueue();
@@ -4108,6 +4218,8 @@
     },
     setSavedPlaylists: payload => mediaHub.receiveLists(payload),
     setSavedTrackDetails: payload => mediaHub.receiveTrack(payload),
+    setPluginPage: payload => mediaHub.receivePage(payload),
+    setCreatorSearchResult: payload => mediaHub.receiveCreatorSearch(payload),
     setPlatformExtras: payload => mediaHub.receiveExtras(payload),
     setEmbeddedVideoState: payload => mediaHub.receiveVideo(payload),
     setUiLanguageState(payload) {
@@ -4291,12 +4403,16 @@
       const m = pluginManagement;
       if (!m.pending || payload?.requestId !== m.requestId || payload.action !== m.action) return;
       clearTimeout(m.timer); m.pending = false;
-      if (payload.error) m.error = '操作未完成或结果未确认。请检查包格式、完整性、兼容性和文件权限，并刷新状态。';
-      else if (['pickPluginPackage', 'dropPluginPackages'].includes(m.action) && !payload.cancelled && (payload.batch || payload.preview)) {
+      if (payload.error) m.error = payload.error === 'recoveryUnavailable' ? '无法准备旧版包。请选择同一插件 ID、版本更低且兼容的完整包；当前选择也必须通过完整性检查。原选择未改变。' : '操作未完成或结果未确认。请检查包格式、完整性、兼容性和文件权限，并刷新状态。';
+      else if (['pickPluginPackage', 'pickPluginRecovery', 'dropPluginPackages'].includes(m.action) && !payload.cancelled && (payload.batch || payload.preview)) {
+        if (m.discardPreview || state.currentPage !== 'settings' || m.navigationToken !== settingsNavigationToken) {
+          m.preview = null; requestPluginManagement('cancelPluginImport'); return;
+        }
         const batch = payload.batch || {token:payload.preview.token, items:[{fileName:'',preview:payload.preview}]};
         const normalize = p => p ? {id:String(p.id||''),displayName:String(p.displayName||''),version:String(p.version||''),sha256:String(p.sha256||''),providers:(p.providers||[]).map(String),capabilities:(p.capabilities||[]).map(String),
           credentialAliases:(Array.isArray(p.credentialAliases)?p.credentialAliases:[]).slice(0,16).map(a=>({key:String(a?.key||''),scope:String(a?.scope||''),legacyKey:String(a?.legacyKey||'')})),
-          hostRequirements:p.hostRequirements ? {minimumHostSdkVersion:String(p.hostRequirements.minimumHostSdkVersion||''),requiredFeatures:(Array.isArray(p.hostRequirements.requiredFeatures)?p.hostRequirements.requiredFeatures:[]).slice(0,32).map(String)} : null} : null;
+          hostRequirements:p.hostRequirements ? {minimumHostSdkVersion:String(p.hostRequirements.minimumHostSdkVersion||''),requiredFeatures:(Array.isArray(p.hostRequirements.requiredFeatures)?p.hostRequirements.requiredFeatures:[]).slice(0,32).map(String)} : null,
+          review:window.AuralisPluginUpdateReview?.normalize(p.review)} : null;
         m.preview = { token:String(batch.token||''), items:(Array.isArray(batch.items)?batch.items:[]).slice(0,16).map(row=>({fileName:String(row.fileName||''),preview:normalize(row.preview),error:row.error?String(row.error):null})) };
       } else if (m.action === 'confirmPluginImport') {
         m.preview = null;
@@ -4326,13 +4442,24 @@
       if (!payload.error) {
         const provider = onlineSettingsProviders.find(p => p.id === pending.providerId);
         const setting = provider?.settings.find(s => s.key === pending.key);
+        if (state.currentTrackId) nativePost('prefetchPlatformTrack', {currentId:state.currentTrackId,handle:''});
+        prefetchSignature = '';
         if (setting) setting.value = pending.value;
         if (provider && Array.isArray(payload.settings)) { provider.settings = payload.settings; provider.configured = payload.configured === true; }
+        // Dependency changes commit only with the native acknowledgment. Old drafts must not
+        // resurrect values after a setting becomes inapplicable.
+        for (const s of provider?.settings || []) {
+          const key = provider.id + ':' + s.key, draft = providerSettingDrafts.get(key);
+          if (draft && (!providerSettingEnabled(s, provider) || draft.definition !== providerSettingDefinition(s)))
+            providerSettingDrafts.delete(key);
+        }
       }
       showToast(payload.error ? String(payload.error) : '插件设置已保存');
       if (state.currentPage === 'settings') renderSettings();
     },
     setPlatformConfiguration(payload) {
+      if (state.currentTrackId) nativePost('prefetchPlatformTrack', {currentId:state.currentTrackId,handle:''});
+      prefetchSignature = '';
       const configuration = state.platformConfiguration;
       for (const key of Object.keys(configuration)) if (key.startsWith('provider:')) delete configuration[key];
       onlinePlaylistProviders.splice(0);
@@ -4350,7 +4477,7 @@
         configuration[errorKey] = platformErrorText(p.error);
         const settings = (Array.isArray(p.settings) ? p.settings : []).filter(s => s && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(s.key) && ['choice','endpoint'].includes(s.kind)).slice(0,16)
           .map(s => ({...s,label:String(s.label || s.key),description:String(s.description || ''),value:String(s.value || ''),choices:Array.isArray(s.choices) ? s.choices.slice(0,16) : []}));
-        const entry = {id, name, capabilities, settings, configured:p.configured !== false, authenticationKey, playlistsKey, errorKey,
+        const entry = {id, name, capabilities, settings, pages:Array.isArray(p.pages)?p.pages:[], pageRevision:p.pageRevision??0, configured:p.configured !== false, authenticationKey, playlistsKey, errorKey,
           loginAction:'generic-platform-login', signoutAction:'generic-platform-signout', refreshAction:'generic-platform-refresh'};
         onlineSettingsProviders.push(entry);
         if (capabilities.includes('PlaylistBrowse')) onlinePlaylistProviders.push(entry);

@@ -3,12 +3,16 @@
 [CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(\.\d+)?$')]
-    [string]$Version = '0.16.10',
+    [string]$Version = '0.16.12',
 
     [ValidateSet('win-x64')]
     [string]$Runtime = 'win-x64',
 
     [switch]$KeepStaging,
+
+    # Reuse an already trusted development identity without modifying certificate stores.
+    [ValidatePattern('^[0-9A-Fa-f]{40}$')]
+    [string]$ReuseCertificateThumbprint,
 
     [Parameter(DontShow)]
     [switch]$Elevated
@@ -104,6 +108,27 @@ if (-not (Test-Path -LiteralPath $certificateScript -PathType Leaf)) {
 }
 if (-not (Test-Path -LiteralPath $buildScript -PathType Leaf)) {
     throw "The MSIX build helper is missing: $buildScript"
+}
+
+if ($ReuseCertificateThumbprint) {
+    if (-not $PSCmdlet.ShouldProcess('Auralis local development package', 'reuse existing certificate, build and sign; no installation or trust changes')) { return }
+    $normalizedThumbprint = $ReuseCertificateThumbprint.ToUpperInvariant()
+    $certificate = Get-Item -LiteralPath "Cert:\CurrentUser\My\$normalizedThumbprint" -ErrorAction Stop
+    Assert-AuralisCertificate -Certificate $certificate
+    if (-not (Test-Path -LiteralPath "Cert:\LocalMachine\TrustedPeople\$normalizedThumbprint")) {
+        throw 'The selected certificate is not already trusted. This reuse mode never modifies certificate stores.'
+    }
+    $buildArguments = @{ Version=$Version; Runtime=$Runtime; IdentityName=$identityName; Publisher=$publisher; CertificateThumbprint=$normalizedThumbprint }
+    if ($KeepStaging) { $buildArguments.KeepStaging = $true }
+    $buildOutput = @(& $buildScript @buildArguments)
+    $packageResult = $buildOutput | Where-Object { $null -ne $_ -and $null -ne $_.PSObject.Properties['Signed'] } | Select-Object -Last 1
+    if ($null -eq $packageResult -or -not $packageResult.Signed) { throw 'No verified signed package was returned.' }
+    $publicCertificate = Join-Path $artifactsDirectory "Auralis-$Version-Public.cer"
+    Export-Certificate -Cert $certificate -FilePath $publicCertificate -Type CERT | Out-Null
+    $packageResult | Add-Member -NotePropertyName PublicCertificate -NotePropertyValue $publicCertificate
+    $packageResult | Add-Member -NotePropertyName ProductionReady -NotePropertyValue $false
+    Write-Warning 'Controlled-test self-signed package only. No application was installed and no certificate trust was changed.'
+    return $packageResult
 }
 
 $operationDescription = @(

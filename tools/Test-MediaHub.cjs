@@ -9,8 +9,8 @@ const output = path.resolve(__dirname, '../artifacts/media-hub-tests');
 const mime = { '.html':'text/html', '.css':'text/css', '.js':'text/javascript', '.svg':'image/svg+xml', '.jpg':'image/jpeg', '.png':'image/png' };
 async function until(test, message) { const deadline=Date.now()+4000; while(!test()) { if(Date.now()>deadline) throw Error(message); await new Promise(r=>setTimeout(r,20)); } }
 async function checkSurface(page, options = false) {
-  await page.locator('.media-hub-dialog').evaluate(n=>Promise.allSettled(n.getAnimations().map(a=>a.finished)));
-  const geometry = await page.locator('.media-hub-dialog').evaluate(dialog => {
+  await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').evaluate(n=>Promise.allSettled(n.getAnimations().map(a=>a.finished)));
+  const geometry = await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').evaluate(dialog => {
     const style=getComputedStyle(dialog), header=dialog.querySelector('header'), body=dialog.querySelector('.media-dialog-body');
     const close=dialog.querySelector('[data-media-action="close"]');
     const rect=dialog.getBoundingClientRect();
@@ -98,7 +98,7 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       const context = await browser.newContext({ viewport:scale===2?{width:720,height:480}:{width:1280,height:820}, deviceScaleFactor:scale, reducedMotion:scale===1.5?'reduce':'no-preference' });
       const page = await context.newPage(); const errors = [], messages = [];
       const openVideo = async () => {
-        await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+        await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
         if(theme==='dark') { await page.locator('#largeCover').focus(); await page.keyboard.press('Enter'); }
         else await page.locator('#largeCover').click();
       };
@@ -166,7 +166,7 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       await checkSurface(page);
       await page.screenshot({path:path.join(output,`${theme}-${scale}-create-playlist.png`)});
       await page.keyboard.press('Enter');
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       assert.equal(await page.locator('.saved-playlist-tabs .active').getAttribute('data-id'),'created');
       await page.locator('[data-media-action="select"][data-id="list1"]').click();
       holdMutation=true;
@@ -176,20 +176,20 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       await until(()=>messages.filter(m=>m.action==='createSavedPlaylist').length>=2,'old create request');
       const oldMutation=messages.filter(m=>m.action==='createSavedPlaylist').at(-1);
       await page.keyboard.press('Escape');
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       await page.locator('[data-media-action="new"]').click();
       await page.locator('#savedPlaylistName').fill('保留新表单');
       await page.keyboard.press('Enter');
       await until(()=>messages.filter(m=>m.action==='createSavedPlaylist').length>=3,'replacement create request');
       const newMutation=messages.filter(m=>m.action==='createSavedPlaylist').at(-1);
       await page.evaluate(({m,items})=>window.Auralis.setSavedPlaylists({...m,items}),{m:oldMutation,items:fixtures});
-      assert(await page.locator('.media-hub-dialog').isVisible(),'old write success cannot close new form');
+      assert(await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').isVisible(),'old write success cannot close new form');
       assert(await page.locator('#newSavedPlaylistForm button').isDisabled(),'new request remains pending');
       await page.evaluate(m=>window.Auralis.setSavedPlaylists({...m,error:{message:'模拟写入失败'}}),newMutation);
       assert.equal(await page.locator('#savedPlaylistName').inputValue(),'保留新表单');
       assert(await page.locator('#newSavedPlaylistForm button').isEnabled(),'matching write failure enables retry');
       await page.keyboard.press('Escape');
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       holdMutation=false;
       await page.screenshot({path:path.join(output,`${theme}-${scale}-saved.png`)});
       await page.locator('[data-media-action="saved-play"][data-index="1"]').click();
@@ -222,13 +222,13 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       await page.locator('[data-media-action="comments"]').click();
       await page.waitForSelector('.media-comments article');
       assert.equal(await page.locator('.media-comments img').count(),0,'untrusted HTML comment remains literal');
-      await page.locator('.media-hub-dialog').evaluate(n=>Promise.allSettled(n.getAnimations().map(a=>a.finished)));
-      const drawer=await page.locator('.media-hub-dialog').boundingBox();
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').evaluate(n=>Promise.allSettled(n.getAnimations().map(a=>a.finished)));
+      const drawer=await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').boundingBox();
       await checkSurface(page);
       const contextTop=await page.locator('.media-dialog-context').evaluate(n=>n.getBoundingClientRect().top);
       await page.screenshot({path:path.join(output,`${theme}-${scale}-comments-list.png`)});
       assert(Math.abs(drawer.x+drawer.width-(page.viewportSize().width-12))<2,'comments dock to right edge');
-      assert.equal(await page.locator('.media-hub-dialog').evaluate(n=>getComputedStyle(n,'::backdrop').backdropFilter),'none','drawer does not blur the whole player');
+      assert.equal(await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').evaluate(n=>getComputedStyle(n,'::backdrop').backdropFilter),'none','drawer does not blur the whole player');
       await page.evaluate(()=>{window.firstCommentNode=document.querySelector('.media-comments article');});
       failNextComments=true;
       await page.locator('.media-dialog-body').evaluate(n=>{n.scrollTop=n.scrollHeight;});
@@ -245,7 +245,7 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       // Only app-owned avatar URLs become image elements; missing/broken images fall back.
       holdComments=true;
       await page.keyboard.press('Escape');
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       await page.locator('[data-media-action="comments"]').click();
       const avatarRequest=messages.filter(m=>m.action==='requestPlatformExtras'&&m.kind==='comments').at(-1);
       await page.route('https://platform-art.auralis.local/avatar-test', route=>route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="#569fc9"/></svg>'}));
@@ -253,13 +253,13 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       await page.waitForFunction(()=>document.querySelector('.comment-avatar img')?.naturalWidth>0);
       assert.equal(await page.locator('.comment-avatar img').count(),1,'remote unproxied avatar is rejected');
       await page.keyboard.press('Escape');
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       await page.locator('[data-media-action="comments"]').click();
       const emoteRequest=messages.filter(m=>m.action==='requestPlatformExtras'&&m.kind==='comments').at(-1);
       await page.evaluate(m=>window.Auralis.setPlatformExtras({...m,items:[{author:'表情测试',text:'你好[打call]<script>不是代码</script>',emotes:[{text:'[打call]',url:'https://platform-art.auralis.local/avatar-test'},{text:'代码',url:'https://evil.invalid/a.png'}]}]}),emoteRequest);
       assert.equal(await page.locator('.comment-emote').count(),scale===1.5?0:1,'emote uses proxy, reduced motion retains text');
       assert((await page.locator('.comment-content').textContent()).includes('<script>不是代码</script>'),'comment text remains escaped');
-      await page.locator('.media-hub-dialog').evaluate(n=>Promise.allSettled(n.getAnimations().map(a=>a.finished)));
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').evaluate(n=>Promise.allSettled(n.getAnimations().map(a=>a.finished)));
       await page.screenshot({path:path.join(output,`${theme}-${scale}-comments.png`)});
       await page.keyboard.press('Escape');
       holdComments=false;
@@ -270,7 +270,7 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       await checkSurface(page,true);
       await page.screenshot({path:path.join(output,`${theme}-${scale}-options.png`)});
       await page.keyboard.press('Escape');
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       await checkDanmaku(page,scale===1.5);
       await openVideo();
       await page.waitForFunction(()=>!document.querySelector('#embeddedVideoPage').hidden);
@@ -287,7 +287,7 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       assert(await page.locator('#embeddedVideoSurface #danmakuLayer').count()===1,'video owns the synchronized danmaku layer');
       assert.equal(await page.locator('#embeddedVideoSurface canvas').evaluate(n=>n.getContext('2d').getImageData(0,0,1,1).data[3]),255,'decoded image remains beneath modal');
       await page.keyboard.press('Escape');
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       await page.locator('[data-media-action="audio"]').click();
       await page.waitForFunction(()=>document.querySelector('#embeddedVideoPage').hidden);
       // A late native success must not reopen video after the user returned to audio.
@@ -317,7 +317,7 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       assert(!(await page.locator('#lyricsScroll').textContent()).includes('OLD LYRICS'));
       assert(await page.locator('#embeddedVideoPage').isHidden());
       await page.keyboard.press('Escape');
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       // A response during dismissal cannot reverse the closing animation.
       holdComments=true;
       await page.locator('[data-media-action="comments"]').click();
@@ -325,7 +325,7 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       const closingRequest=messages.filter(m=>m.action==='requestPlatformExtras'&&m.kind==='comments').at(-1);
       await page.keyboard.press('Escape');
       await page.evaluate(m=>window.Auralis.setPlatformExtras({...m,items:[{author:'LATE',text:'dismissal response'}]}),closingRequest);
-      await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       holdComments=false;
       // Geometric centers remain stable through play/pause and both fullscreen layouts.
       for (let i=0;i<4;i++) {
@@ -347,19 +347,19 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
       await page.locator('[data-media-action="comments"]').click();
       const retiredComments=messages.findLast(m=>m.action==='requestPlatformExtras'&&m.kind==='comments');
       await page.evaluate(()=>window.Auralis.setPlatformConfiguration({providers:[]}));
-      assert(await page.locator('.media-hub-dialog').isHidden(),'removed comment capability closes its open panel');
+      assert(await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').isHidden(),'removed comment capability closes its open panel');
       assert.equal(await page.locator('#largeCover').getAttribute('role'),'img','saved video flag does not invent missing plugin capability');
       const retiredStart=messages.length;
       await page.locator('#largeCover').evaluate(n=>n.click());
       await page.evaluate(m=>window.Auralis.setPlatformExtras({...m,items:[{author:'Late',text:'Retired response'}],nextPageHandle:'retired-next'}),retiredComments);
       await page.waitForTimeout(80);
       assert(!messages.slice(retiredStart).some(m=>(m.action==='setEmbeddedVideo'&&m.enabled)||m.action==='requestPlatformExtras'),'retired capabilities issue no new media requests');
-      assert(await page.locator('.media-hub-dialog').isHidden(),'late comment reply cannot revive retired panel');
+      assert(await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').isHidden(),'late comment reply cannot revive retired panel');
       await page.evaluate(()=>window.Auralis.setPlatformConfiguration({providers:[{id:'bili',name:'Fixture',capabilities:['TrackSearch','MediaExtras','Comments','VideoResolution']}]}));
       holdComments=false;
       await page.locator('[data-media-action="comments"]').click();
       await page.locator('.media-comments article').first().waitFor();
-      await page.keyboard.press('Escape');await page.locator('.media-hub-dialog').waitFor({state:'hidden'});
+      await page.keyboard.press('Escape');await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').waitFor({state:'hidden'});
       // Video capability, not a hard-coded provider pair, selects the shared fullscreen engine.
       holdVideo=true;
       await openVideo();
@@ -408,9 +408,9 @@ const lists = [{ id:'list1', name:'跨平台收藏', entries:[
         await page.evaluate(()=>window.Auralis.setUiLanguageState({preference:'en-US',resolvedLanguage:'en-US'}));
         await page.locator('[data-media-action="options"]').click();
         await page.waitForFunction(()=>document.querySelector('#mediaDialogTitle').textContent==='Playback extras');
-        await page.locator('.media-hub-dialog').evaluate(n=>Promise.allSettled(n.getAnimations({subtree:true}).map(a=>a.finished)));
+        await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').evaluate(n=>Promise.allSettled(n.getAnimations({subtree:true}).map(a=>a.finished)));
         assert.equal(await page.locator('#coverVideoOption').getAttribute('role'),'switch');
-        const modal=await page.locator('.media-hub-dialog').boundingBox();
+        const modal=await page.locator('dialog[aria-labelledby="mediaDialogTitle"]').boundingBox();
         assert(modal.x>=0&&modal.x+modal.width<=720,'English dialog fits minimum width');
         await page.screenshot({path:path.join(output,`${theme}-${scale}-contrast-en.png`)});
         await page.keyboard.press('Escape');

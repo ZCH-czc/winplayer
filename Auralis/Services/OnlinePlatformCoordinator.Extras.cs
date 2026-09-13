@@ -4,7 +4,6 @@ namespace Auralis.Services;
 
 internal sealed partial class OnlinePlatformCoordinator
 {
-    private readonly Dictionary<string, (string Track, string Cursor, DateTimeOffset Created)> _commentPages = new();
     private readonly CommentAvatarRegistry _commentAvatars = new();
 
     private string? RegisterCommentAvatar(string providerId, Uri? uri,
@@ -94,45 +93,13 @@ internal sealed partial class OnlinePlatformCoordinator
                 track.Id.ProviderId, (capability, ct) => capability.GetDanmakuAsync(track.Id, ct), token);
     }
 
-    internal async Task<PlatformResult<OnlineCommentPage>> GetCommentsAsync(string handle, string? pageHandle, CancellationToken token)
-    {
-        var track = GetBackendTrack(handle);
-        if (track is null) return PlatformResult<OnlineCommentPage>.Failure(PlatformErrorCode.NotFound, "歌曲入口已过期，请重新打开歌单。");
-        string? cursor = null;
-        lock (_gate)
-        {
-            foreach (var key in _commentPages.Where(p => DateTimeOffset.UtcNow - p.Value.Created > HandleLifetime).Select(p => p.Key).ToArray()) _commentPages.Remove(key);
-            if (!string.IsNullOrEmpty(pageHandle))
-            {
-                if (!_commentPages.TryGetValue(pageHandle, out var page) || page.Track != handle)
-                    return PlatformResult<OnlineCommentPage>.Failure(PlatformErrorCode.NotFound, "评论分页已过期，请重新打开评论。");
-                cursor = page.Cursor;
-            }
-        }
-        var result = await _backend.Router.GetCommentsAsync(track.Id.ProviderId,
-            new PlatformCommentsRequest(track.Id, new PlatformPageRequest(20, cursor)), token).ConfigureAwait(false);
-        if (!result.IsSuccess) return PlatformResult<OnlineCommentPage>.Failure(result.Error!);
-        var artworkAuthorization = await _backend.GetCommentArtworkAuthorizationAsync(track.Id.ProviderId, token).ConfigureAwait(false);
-        string? next = null;
-        if (!string.IsNullOrEmpty(result.Value.NextCursor))
-        {
-            lock (_gate)
-            {
-                if (_commentPages.Count >= 400) _commentPages.Remove(_commentPages.MinBy(p => p.Value.Created).Key);
-                next = CreateHandle("comments");
-                _commentPages[next] = (handle, result.Value.NextCursor, DateTimeOffset.UtcNow);
-            }
-        }
-        // Only controlled proxy URLs cross the boundary, never remote avatar URLs or cursors.
-        return PlatformResult<OnlineCommentPage>.Success(new OnlineCommentPage(result.Value.Items.Take(100)
-            .Select(c => new OnlineCommentView(c.Author.DisplayName, c.Text, c.LikeCount ?? 0, c.PublishedAt,
-                RegisterCommentAvatar(track.Id.ProviderId, c.Author.AvatarUrl, artworkAuthorization.Policy, artworkAuthorization.IsActive),
-                c.Emotes.Take(64).Where(e => e.Text.Length is > 0 and <= 100)
-                    .Select(e => new OnlineCommentEmote(e.Text, RegisterCommentAvatar(track.Id.ProviderId, e.Url,
-                        artworkAuthorization.Policy, artworkAuthorization.IsActive))).Where(e => e.Url is not null).ToArray())).ToArray(), next));
-    }
 }
 
 internal sealed record OnlineCommentEmote(string Text, string? Url);
-internal sealed record OnlineCommentView(string Author, string Text, long LikeCount, DateTimeOffset? PublishedAt, string? AvatarUrl, IReadOnlyList<OnlineCommentEmote> Emotes);
+internal sealed record OnlineCommentView(string Author, string Text, long LikeCount, DateTimeOffset? PublishedAt, string? AvatarUrl, IReadOnlyList<OnlineCommentEmote> Emotes)
+{
+    public string? Handle { get; init; }
+    public long? ReplyCount { get; init; }
+    public string? ReplyToAuthor { get; init; }
+}
 internal sealed record OnlineCommentPage(IReadOnlyList<OnlineCommentView> Items, string? NextPageHandle);

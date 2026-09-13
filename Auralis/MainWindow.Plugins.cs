@@ -47,6 +47,7 @@ public partial class MainWindow
             return;
         }
         _pluginManagementBusy = true;
+        string payload;
         try
         {
             var backend = ((App)System.Windows.Application.Current).PlatformBackend;
@@ -60,19 +61,29 @@ public partial class MainWindow
             object? results = null;
             bool? credentialsCleared = null;
             var cancelled = false;
-            if (action == "pickPluginPackage")
+            if (action is "pickPluginPackage" or "pickPluginRecovery")
             {
+                if (_platformPluginPreviewOpen) throw new InvalidDataException();
+                string? recoveryId = null;
+                if (action == "pickPluginRecovery")
+                {
+                    if (!root.TryGetProperty("id", out var recovery) || recovery.ValueKind != JsonValueKind.String ||
+                        recovery.GetString() is not { Length: > 0 and <= 64 } value) throw new InvalidDataException();
+                    recoveryId = value;
+                }
                 var picker = new Microsoft.Win32.OpenFileDialog
                 {
-                    Title = "导入平台插件", Filter = "Auralis 插件包 (*.auralis-plugin;*.zip)|*.auralis-plugin;*.zip",
-                    CheckFileExists = true, Multiselect = true
+                    Title = recoveryId is null ? "导入平台插件" : "选择此插件的旧版包", Filter = "Auralis 插件包 (*.auralis-plugin;*.zip)|*.auralis-plugin;*.zip",
+                    CheckFileExists = true, Multiselect = recoveryId is null
                 };
                 if (picker.ShowDialog(this) != true) cancelled = true;
                 else
                 {
                     // Time spent deciding in the native picker is not a package parsing timeout.
                     using var importTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
-                    batch = await Task.Run(() => manager.PrepareBatchAsync(picker.FileNames, importTimeout.Token));
+                    batch = recoveryId is null
+                        ? await Task.Run(() => manager.PrepareBatchAsync(picker.FileNames, importTimeout.Token))
+                        : await Task.Run(() => manager.PrepareRecoveryAsync(picker.FileName, recoveryId, importTimeout.Token));
                     _platformPluginPreviewOpen = true;
                 }
             }
@@ -116,19 +127,22 @@ public partial class MainWindow
                         if (_platformLogins.Remove(provider.Id, out var login)) ClosePlatformLoginSession(login);
                     }
                     credentialsCleared = await backend.DisableAndClearAsync(id.GetString()!, new System.Windows.Interop.WindowInteropHelper(this).Handle, timeout.Token);
+                    ++_prefetchVersion;
+                    await DrainPrefetchAsync(null);
                     await SendPlatformConfigurationAsync();
                 }
             }
-            var payload = JsonSerializer.Serialize(new { requestId, action, preview, batch, results, cancelled, credentialsCleared }, WebJsonOptions);
-            await ExecuteScriptAsync($"window.Auralis?.setPluginManagementResult({payload})");
+            payload = JsonSerializer.Serialize(new { requestId, action, preview, batch, results, cancelled, credentialsCleared }, WebJsonOptions);
         }
         catch
         {
             // Never return package paths, exception text, ZIP names or local state contents.
-            var payload = JsonSerializer.Serialize(new { requestId, action, error = "pluginManagementFailed" }, WebJsonOptions);
-            await ExecuteScriptAsync($"window.Auralis?.setPluginManagementResult({payload})");
+            payload = JsonSerializer.Serialize(new { requestId, action, error = action == "pickPluginRecovery" ? "recoveryUnavailable" : "pluginManagementFailed" }, WebJsonOptions);
         }
         finally { _pluginManagementBusy = false; }
+        // A discarded picker result can post cancel immediately from this callback.
+        // Finish the native operation before notifying Web so that follow-up is not dropped as busy.
+        await ExecuteScriptAsync($"window.Auralis?.setPluginManagementResult({payload})");
     }
 
     private async Task OpenPluginFolderAsync()

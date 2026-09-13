@@ -4,6 +4,12 @@ using Auralis.Platform.Abstractions;
 using Auralis.Platform.Host;
 using Auralis.Platform.Host.Tests;
 
+if (args.Length == 3 && args[0] == "--page-upgrade")
+{
+    await PluginPageUpgradeTests.RunAsync(args[1], args[2]);
+    return;
+}
+
 static void Check(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
@@ -204,8 +210,10 @@ try
     }
     Console.WriteLine("PASS revocation: deleted session, denied late write, disabled capability route.");
     await PluginManagerTests.RunAsync(Path.Combine(root, "management"));
+    await PluginUpdateReviewTests.RunAsync(Path.Combine(root, "update-review"));
     await CredentialAliasTests.RunAsync(Path.Combine(root, "credential-aliases"));
     await HostCompatibilityTests.RunAsync(Path.Combine(root, "host-compatibility"));
+    await SettingsV2Tests.RunAsync(Path.Combine(root, "settings-v2"));
     await CommentArtworkPolicyTests.RunAsync(Path.Combine(root, "comment-artwork"));
     await CoordinatorRoutingTests.RunAsync(Path.Combine(root, "native-routing"));
     await LyricsCapabilityRoutingTests.RunAsync(Path.Combine(root, "lyrics-routing"));

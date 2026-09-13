@@ -20,6 +20,16 @@ public sealed class PlatformBackendService : IAsyncDisposable
     private int _disposeStarted;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _disabledPlugins = new(StringComparer.OrdinalIgnoreCase);
     public bool IsPluginDisabled(string id) => _disabledPlugins.ContainsKey(id);
+    private readonly MediaContextRevision _mediaContext = new();
+    internal void InvalidateMediaContext(string providerId) => _mediaContext.Invalidate(providerId);
+    internal async Task<(long Revision, Func<bool> IsCurrent)> CaptureMediaContextAsync(string providerId, CancellationToken token)
+    {
+        var registration = (await DiscoverAsync(token).ConfigureAwait(false)).Providers.FirstOrDefault(p =>
+            p.Provider.Id.Equals(providerId, StringComparison.OrdinalIgnoreCase));
+        var revision = _mediaContext.Read(providerId);
+        return (revision, () => registration is not null && Volatile.Read(ref _disposeStarted) == 0 &&
+            !IsPluginDisabled(registration.PluginId) && revision == _mediaContext.Read(providerId));
+    }
 
     internal async Task<(PlatformCommentArtworkPolicy Policy, Func<bool> IsActive)> GetCommentArtworkAuthorizationAsync(
         string providerId, CancellationToken token)
@@ -34,11 +44,13 @@ public sealed class PlatformBackendService : IAsyncDisposable
     internal async Task<IReadOnlyList<ProviderSettingView>> ReadSettingsAsync(PlatformProviderRegistration registration, CancellationToken token = default)
     {
         var result = new List<ProviderSettingView>();
+        var values = await _settings.ReadValuesAsync(registration.PluginId, token).ConfigureAwait(false);
         foreach (var setting in registration.Provider.Settings)
         {
-            var stored = await _settings.GetScopedAsync(registration.PluginId, setting.Key, token);
+            var stored = values.GetValueOrDefault(setting.Key);
             if (!setting.TryNormalize(stored ?? setting.DefaultValue, out var value)) value = setting.DefaultValue;
-            result.Add(new(setting.Key, setting.Label, setting.Description, setting.Kind, value, setting.Required, setting.Choices));
+            result.Add(new(setting.Key, setting.Label, setting.Description, setting.Kind, value, setting.Required, setting.Choices,
+                setting.LabelEn, setting.DescriptionEn, setting.Group, setting.When, setting.IsEnabled(values)));
         }
         return result;
     }
@@ -50,11 +62,14 @@ public sealed class PlatformBackendService : IAsyncDisposable
         var setting = registration.Provider.Settings.FirstOrDefault(s => s.Key == key);
         if (setting is null || !setting.TryNormalize(value, out var normalized)) throw new ArgumentException("Undeclared or invalid setting.");
         // No provider code runs when editing a manifest-declared public setting.
-        await _settings.SetScopedAsync(registration.PluginId, setting.Key, normalized, token);
+        InvalidateMediaContext(providerId);
+        try { await _settings.SetScopedAsync(registration.PluginId, setting.Key, normalized, token); }
+        finally { InvalidateMediaContext(providerId); }
     }
 
     internal sealed record ProviderSettingView(string Key, string Label, string Description, string Kind, string Value,
-        bool Required, IReadOnlyList<PlatformSettingChoice> Choices);
+        bool Required, IReadOnlyList<PlatformSettingChoice> Choices, string LabelEn, string DescriptionEn,
+        PlatformSettingGroup? Group, PlatformSettingCondition? When, bool Enabled);
 
     internal async Task<PlatformPluginManifest?> FindPluginForDisableAsync(string id, CancellationToken token)
     {
@@ -200,13 +215,8 @@ public sealed class PlatformBackendService : IAsyncDisposable
             {
                 budget.Token.ThrowIfCancellationRequested();
                 if (IsPluginDisabled(registration.PluginId)) continue;
-                var ready = true;
-                foreach (var setting in registration.Provider.Settings.Where(s => s.Required))
-                {
-                    var value = await _settings.GetScopedAsync(registration.PluginId, setting.Key, budget.Token).ConfigureAwait(false);
-                    if (!setting.TryNormalize(value ?? setting.DefaultValue, out var normalized) || string.IsNullOrWhiteSpace(normalized))
-                        ready = false;
-                }
+                var settings = await ReadSettingsAsync(registration, budget.Token).ConfigureAwait(false);
+                var ready = settings.All(s => !s.Enabled || !s.Required || !string.IsNullOrWhiteSpace(s.Value));
                 if (!ready) continue;
                 var result = await Router.RouteAsync<IPlatformLyricsLookupCapability, PlatformLyricsLookupResult>(registration.Provider.Id,
                     (capability, cancellation) => capability.LookupAsync(request, cancellation), budget.Token, timeout: timeout).ConfigureAwait(false);

@@ -1,0 +1,8 @@
+{
+  "schemaVersion":5,"id":"sample.pages","displayName":"Declarative page sample","version":"1.0.0",
+  "minimumHostApiVersion":1,"maximumHostApiVersion":1,
+  "hostRequirements":{"minimumHostSdkVersion":"2.3.0","requiredFeatures":["comment-artwork.v1","declarative-pages.v1"]},
+  "entryAssembly":"Auralis.Sample.Pages.dll","entryType":"Auralis.Sample.Pages.Plugin",
+  "providers":[{"id":"sample.pages","displayName":"Page sample","capabilities":["Pages","TrackSearch"],
+    "commentArtworkDomains":[],"pages":[{"id":"profile","label":"演示资料","labelEn":"Sample profile","placement":"creator"}]}]
+}

@@ -1113,6 +1113,15 @@ public partial class MainWindow : Window
                         await PlayPlatformTrackAsync(platformHandleProperty.GetString());
                     }
                     break;
+                case "searchPlatformCreators":
+                    await SearchPlatformCreatorsAsync(root);
+                    break;
+                case "readPluginPage":
+                    await ReadPluginPageAsync(root);
+                    break;
+                case "readPluginGlobalPage":
+                    await ReadPluginPageAsync(root, global: true);
+                    break;
                 case "requestPlatformExtras":
                     await SendPlatformExtrasAsync(root);
                     break;
@@ -1162,6 +1171,7 @@ public partial class MainWindow : Window
                         await SendPluginInventoryAsync(pluginRequestId);
                     break;
                 case "pickPluginPackage":
+                case "pickPluginRecovery":
                 case "dropPluginPackages":
                 case "confirmPluginImport":
                 case "cancelPluginImport":
@@ -2049,7 +2059,9 @@ public partial class MainWindow : Window
         try
         {
             ++_prefetchVersion;
+            var mediaContext = await OnlinePlatforms.CaptureMediaContextAsync(handle, cancellation.Token);
             var prefetched = await DrainPrefetchAsync(handle, cancellation.Token);
+            preparedSource = prefetched?.Source;
             var leaseResult = prefetched is not null
                 ? PlatformResult<PlatformStreamLease>.Success(prefetched.Lease)
                 : await OnlinePlatforms.AcquireStreamAsync(handle, cancellation.Token);
@@ -2061,10 +2073,16 @@ public partial class MainWindow : Window
 
             preparedSource = prefetched?.Source ?? await _onlinePlaybackSource.PrepareAsync(
                 leaseResult.Value,
-                $"{track.ProviderId}:{track.Id}:{leaseResult.Value.Quality.Id}",
+                $"{mediaContext.CacheKey}:{leaseResult.Value.Quality.Id}",
                 cancellation.Token);
             cancellation.Token.ThrowIfCancellationRequested();
 
+            if (!mediaContext.IsCurrent() || prefetched is not null && !prefetched.IsCurrent())
+            {
+                await SendPlatformPlaybackResultAsync(handle, false, null,
+                    new PlatformError(PlatformErrorCode.Cancelled, "插件设置或账号已改变，请重新播放。"));
+                return;
+            }
             StopEmbeddedVideo(false);
             _mediaPlayer.Close();
             // Retire the old identity before yielding: a late video-return message must
@@ -2097,6 +2115,16 @@ public partial class MainWindow : Window
             cancellation.Token.ThrowIfCancellationRequested();
             if (_currentTrackId != handle) return;
             // The full-screen projection must commit before the new audio/video can sound.
+            if (!mediaContext.IsCurrent() || prefetched is not null && !prefetched.IsCurrent())
+            {
+                _currentAudioSource = null;
+                await _onlinePlaybackSource.ReleaseAsync();
+                cancellation.Token.ThrowIfCancellationRequested();
+                if (_currentTrackId != handle) return;
+                await SendPlatformPlaybackResultAsync(handle, false, null,
+                    new PlatformError(PlatformErrorCode.Cancelled, "插件设置或账号已改变，请重新播放。"));
+                return;
+            }
             _mediaPlayer.Open(preparedSource.Source);
             await LoadPlatformLyricsAsync(handle, track, cancellation.Token);
         }
@@ -2372,7 +2400,7 @@ public partial class MainWindow : Window
                 if (backend.IsPluginDisabled(registration.PluginId)) continue;
                 var provider = registration.Provider;
                 var settings = await backend.ReadSettingsAsync(registration);
-                var ready = settings.All(s => !s.Required || !string.IsNullOrEmpty(s.Value));
+                var ready = settings.All(s => !s.Enabled || !s.Required || !string.IsNullOrEmpty(s.Value));
                 var collectionState = await OnlinePlatforms.ReadProviderCollectionsAsync(provider, ready, CancellationToken.None);
                 object? authentication = collectionState.Authentication is { } auth
                     ? new { status = auth.Status.ToString().ToLowerInvariant(), accountDisplayName = auth.AccountDisplayName, accountId = auth.AccountId } : null;
@@ -2381,6 +2409,8 @@ public partial class MainWindow : Window
                 // A disable may finish while an account or collection request is in flight.
                 if (backend.IsPluginDisabled(registration.PluginId)) continue;
                 available.Add((registration.PluginId, new { id = provider.Id, name = provider.DisplayName,
+                    pageRevision = (await backend.CaptureMediaContextAsync(provider.Id, CancellationToken.None)).Revision,
+                    pages = provider.Pages,
                     capabilities = provider.Capabilities.Select(c => c.ToString()).ToArray(),
                     authentication, playlists, error, settings, configured = ready }));
             }

@@ -10,7 +10,10 @@ public sealed record ManagedPluginState(int SchemaVersion, Dictionary<string, Ma
 public sealed record PluginSessionPlan(IReadOnlyList<string> Roots, IReadOnlySet<string> EnabledIds);
 public sealed record PluginPackagePreview(string Token, string Id, string DisplayName, string Version,
     string Sha256, IReadOnlyList<string> Providers, IReadOnlyList<string> Capabilities,
-    IReadOnlyList<PlatformCredentialAlias>? CredentialAliases = null, PlatformHostRequirements? HostRequirements = null);
+    IReadOnlyList<PlatformCredentialAlias>? CredentialAliases = null, PlatformHostRequirements? HostRequirements = null)
+{
+    public PluginPackageReview? Review { get; init; }
+}
 public sealed record ManagedPluginItem(string Id, string DisplayName, string Version, IReadOnlyList<string> Providers,
     string State, bool Enabled, bool Active, bool CanEnable, string? CompatibilityIssue = null);
 public sealed record ManagedPluginInventory(IReadOnlyList<ManagedPluginItem> Items, IReadOnlyList<string> Issues);
@@ -23,7 +26,7 @@ public sealed record PluginImportResult(string FileName, string? Id, string? Err
 /// in a new host session. No assemblies, accounts, HTTP clients or platform-specific implementations here.
 /// This is an integrity boundary for trusted in-process code, not a malicious-code sandbox.
 /// </summary>
-public sealed class PlatformPluginManager
+public sealed partial class PlatformPluginManager
 {
     private const long Limit = 128L * 1024 * 1024;
     private static readonly Regex IdPattern = new("^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", RegexOptions.CultureInvariant);
@@ -39,7 +42,7 @@ public sealed class PlatformPluginManager
     public const int MaximumBatchCount = 16;
     private const long BatchLimit = 256L * 1024 * 1024;
     private sealed record Prepared(string Directory, PlatformPluginManifest Manifest, PluginPackagePreview Preview,
-        Dictionary<string, string> Hashes);
+        Dictionary<string, string> Hashes, string Baseline);
 
     public PlatformPluginManager(string storageRoot, IEnumerable<string> legacyRoots, PlatformHostCompatibility? compatibility = null,
         int minimumManifestSchemaVersion = PlatformPluginManifestSchema.MinimumRuntimeVersion)
@@ -271,10 +274,12 @@ public sealed class PlatformPluginManager
             Directory.Move(payload, finalPayload);
             manifest = (await new PlatformPluginCatalog([finalPayload], _compatibility).DiscoverAsync(token).ConfigureAwait(false)).Plugins.Single();
             var hashes = await HashPayloadAsync(finalPayload, token).ConfigureAwait(false);
+            var baseline = await ReadReviewBaselineAsync(manifest.Id, token).ConfigureAwait(false);
             var preview = new PluginPackagePreview(Guid.NewGuid().ToString("N"), manifest.Id, manifest.DisplayName,
                 manifest.Version.ToString(), sha, manifest.Providers.Select(p => p.DisplayName).ToArray(),
                 manifest.Providers.SelectMany(p => p.Capabilities).Select(c => c.ToString()).Distinct().ToArray(), manifest.CredentialAliases, manifest.HostRequirements);
-            var prepared = new Prepared(staging, manifest, preview, hashes);
+            preview = preview with { Review = BuildReview(baseline, manifest) };
+            var prepared = new Prepared(staging, manifest, preview, hashes, baseline.Fingerprint);
             staging = null;
             return prepared;
         }
@@ -358,6 +363,7 @@ public sealed class PlatformPluginManager
                 token.ThrowIfCancellationRequested();
                 try
                 {
+                    await ValidateReviewBaselineAsync(item.Package, token).ConfigureAwait(false);
                     var hashes = await HashPayloadAsync(item.Package.Manifest.PluginDirectory, token).ConfigureAwait(false);
                     if (hashes.Count != item.Package.Hashes.Count || hashes.Any(p => !item.Package.Hashes.TryGetValue(p.Key, out var h) || h != p.Value))
                         throw new InvalidDataException();
@@ -411,6 +417,7 @@ public sealed class PlatformPluginManager
         {
             var prepared = _prepared;
             if (!trust || prepared is null || prepared.Preview.Token != previewToken) throw new InvalidDataException("Explicit approval required.");
+            await ValidateReviewBaselineAsync(prepared, token).ConfigureAwait(false);
             var hashes = await HashPayloadAsync(prepared.Manifest.PluginDirectory, token).ConfigureAwait(false);
             if (hashes.Count != prepared.Hashes.Count || hashes.Any(p => !prepared.Hashes.TryGetValue(p.Key, out var h) || h != p.Value))
                 throw new InvalidDataException("Package changed after preview.");

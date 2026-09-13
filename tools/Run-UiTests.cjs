@@ -8,8 +8,15 @@ const repository = path.resolve(__dirname, '..');
 const suites = new Map([
   ['plugins', 'Test-PluginSettings.cjs'],
   ['settings', 'Test-OnlineSettings.cjs'],
+  ['settingsv2', 'Test-SettingsV2.cjs'],
   ['collections', 'Test-OnlinePluginPages.cjs'],
   ['media', 'Test-MediaHub.cjs'],
+  ['community', 'Test-CreatorCommunity.cjs'],
+  ['pages', 'Test-DeclarativePages.cjs'],
+  ['pagefeeds', 'Test-PluginPageFeeds.cjs'],
+  ['globalpages', 'Test-PluginGlobalPages.cjs'],
+  ['querypages', 'Test-PluginQueryPages.cjs'],
+  ['mediapages', 'Test-PluginMediaPages.cjs'],
   ['playback', 'Test-PlaybackComponents.cjs'],
   ['transport', 'Test-MediaTransportComponents.cjs'],
 ]);
@@ -35,7 +42,11 @@ if (!fs.existsSync(path.join(uiRoot, 'index.html'))) {
   console.error('AURALIS_UI_ROOT must point to a complete source or published wwwroot directory.');
   process.exit(2);
 }
-const environment = {...process.env, AURALIS_UI_ROOT: uiRoot};
+const environment = {...process.env};
+// Keep source-mode asset projection enabled in fixture servers. Only explicit publish tests
+// set AURALIS_UI_ROOT; otherwise those servers must serve the MSBuild-linked brand source.
+if (process.env.AURALIS_UI_ROOT) environment.AURALIS_UI_ROOT = uiRoot;
+else delete environment.AURALIS_UI_ROOT;
 delete environment.NODE_PATH;
 for (const name of selected) {
   console.log(`\nAuralis UI suite: ${name}`);

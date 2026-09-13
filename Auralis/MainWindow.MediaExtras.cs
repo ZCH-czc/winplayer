@@ -56,9 +56,9 @@ public partial class MainWindow
     {
         var handle = JsonText(root, "handle");
         var kind = JsonText(root, "kind");
-        if (handle is not { Length: > 0 and <= 128 } || kind is not ("parts" or "danmaku" or "comments") ||
-            !root.TryGetProperty("requestId", out var id) || !id.TryGetInt64(out var requestId)) return;
-        await RestoreSavedHandleAsync(handle);
+        if (handle is not { Length: > 0 and <= 128 } || kind is not ("parts" or "danmaku" or "comments" or "creator" or "feed" or "replies") ||
+            !root.TryGetProperty("requestId", out var id) || !id.TryGetInt64(out var requestId) || requestId is <= 0 or > 9007199254740991 ||
+            JsonText(root, "pageHandle")?.Length > 128 || JsonText(root, "rootHandle")?.Length > 128) return;
         if (_extrasRequests.Remove(kind, out var previous)) { previous.Cancel(); previous.Dispose(); }
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var token = cancellation.Token;
@@ -68,6 +68,8 @@ public partial class MainWindow
         string? nextPageHandle = null;
         try
         {
+            await RestoreSavedHandleAsync(handle);
+            token.ThrowIfCancellationRequested();
             if (kind == "parts")
             {
                 var result = await OnlinePlatforms.GetPartsAsync(handle, token);
@@ -78,9 +80,22 @@ public partial class MainWindow
                 var result = await OnlinePlatforms.GetDanmakuAsync(handle, token);
                 if (result.IsSuccess) items = result.Value; else error = ToPlatformError(result.Error);
             }
+            else if (kind == "creator")
+            {
+                var result = await OnlinePlatforms.GetCreatorAsync(handle, token);
+                if (result.IsSuccess) items = new[] { result.Value }; else error = ToPlatformError(result.Error);
+            }
+            else if (kind == "feed")
+            {
+                var result = await OnlinePlatforms.GetCreatorPostsAsync(handle, JsonText(root, "pageHandle"), token);
+                if (result.IsSuccess) { items = result.Value.Items; nextPageHandle = result.Value.NextPageHandle; }
+                else error = ToPlatformError(result.Error);
+            }
             else
             {
-                var result = await OnlinePlatforms.GetCommentsAsync(handle, JsonText(root, "pageHandle"), token);
+                if (kind == "replies" && string.IsNullOrEmpty(JsonText(root, "rootHandle"))) return;
+                var result = await OnlinePlatforms.GetCommunityCommentsAsync(handle, JsonText(root, "pageHandle"),
+                    kind == "replies" ? JsonText(root, "rootHandle") : null, JsonText(root, "sort") == "newest", token);
                 if (result.IsSuccess) { items = result.Value.Items; nextPageHandle = result.Value.NextPageHandle; }
                 else error = ToPlatformError(result.Error);
             }

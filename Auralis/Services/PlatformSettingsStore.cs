@@ -31,14 +31,16 @@ internal sealed class PlatformSettingsStore
             "platform-settings.json");
     }
 
-    private async ValueTask<string?> GetAsync(string key, CancellationToken cancellationToken)
+    internal async Task<IReadOnlyDictionary<string, string>> ReadValuesAsync(string pluginId, CancellationToken cancellationToken)
     {
-        ValidateKey(key);
+        ValidatePart(pluginId);
         await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            var declarations = await ResolveDeclarationsAsync(pluginId, cancellationToken).ConfigureAwait(false);
             await EnsureLoadedAsync(cancellationToken).ConfigureAwait(false);
-            return _values!.TryGetValue(key, out var value) ? value : null;
+            return new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                declarations.ToDictionary(s => s.Key, s => ReadDeclaredValue(pluginId, s), StringComparer.Ordinal));
         }
         finally
         {
@@ -55,13 +57,18 @@ internal sealed class PlatformSettingsStore
         var declaration = (await ResolveDeclarationsAsync(pluginId, token).ConfigureAwait(false))
             .FirstOrDefault(s => string.Equals(s.Key, key, StringComparison.Ordinal));
         if (declaration is null) return null;
-        var value = await GetAsync($"plugin:{pluginId}:{key}", token).ConfigureAwait(false);
-        if (value is not null)
+        var values = await ReadValuesAsync(pluginId, token).ConfigureAwait(false);
+        return declaration.IsEnabled(values) && values.TryGetValue(key, out var value) ? value : null;
+    }
+
+    // Caller holds _gate. Read all dependencies and their saved values from the same snapshot.
+    private string ReadDeclaredValue(string pluginId, PlatformSettingManifest declaration)
+    {
+        if (_values!.TryGetValue($"plugin:{pluginId}:{declaration.Key}", out var value))
             return declaration.TryNormalize(value, out var normalized) ? normalized : declaration.DefaultValue;
         foreach (var legacyKey in declaration.LegacyKeys)
         {
-            var legacy = await GetAsync(legacyKey, token).ConfigureAwait(false);
-            if (legacy is not null && declaration.TryNormalize(legacy, out var migrated)) return migrated;
+            if (_values.TryGetValue(legacyKey, out var legacy) && declaration.TryNormalize(legacy, out var migrated)) return migrated;
         }
         return declaration.DefaultValue;
     }
@@ -76,11 +83,17 @@ internal sealed class PlatformSettingsStore
         await _gate.WaitAsync(token);
         try
         {
+            var declarations = await ResolveDeclarationsAsync(pluginId, token).ConfigureAwait(false);
+            var declaration = declarations.FirstOrDefault(s => s.Key == key);
+            if (declaration is null || !declaration.TryNormalize(value, out var normalized))
+                throw new ArgumentException("Undeclared or invalid setting.");
             await EnsureLoadedAsync(token);
+            var snapshot = declarations.ToDictionary(s => s.Key, s => ReadDeclaredValue(pluginId, s), StringComparer.Ordinal);
+            if (!declaration.IsEnabled(snapshot)) throw new InvalidOperationException("Setting is not currently applicable.");
             var values = _values!;
             var previous = values.GetValueOrDefault(scoped);
             if (previous is null && values.Count >= 128) throw new InvalidOperationException("Setting limit reached.");
-            values[scoped] = value;
+            values[scoped] = normalized;
             try { await SaveAsync(token); }
             catch { if (previous is null) values.Remove(scoped); else values[scoped] = previous; throw; }
         }

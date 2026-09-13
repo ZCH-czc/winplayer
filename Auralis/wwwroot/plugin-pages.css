@@ -1,0 +1,86 @@
+.plugin-page-dialog { width:min(880px,calc(100vw - 32px)); max-height:calc(100dvh - 104px); }
+.plugin-page-dialog[open] { animation:none; }
+.plugin-page-dialog > header { gap:12px; flex-shrink:0; }
+.plugin-page-dialog > header h2 { flex:1; min-width:0; overflow-wrap:anywhere; }
+.plugin-page-dialog [hidden] { display:none !important; }
+.plugin-page-dialog h2:focus { outline:none; }
+.plugin-page-dialog > header svg { width:18px; height:18px; fill:none; }
+.plugin-page-dialog .media-dialog-body { min-height:100px; min-width:0; overflow:auto; }
+.plugin-page-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(270px,100%),1fr)); gap:16px; }
+.plugin-page-cards.is-list { grid-template-columns:minmax(0,1fr); }
+.plugin-page-card { min-width:0; padding:16px; background:var(--surface); border:1px solid var(--stroke); border-radius:var(--radius); }
+.plugin-page-card h3 { font-size:16px; margin:0 0 8px; }
+.plugin-page-card p,.plugin-page-description { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.65; }
+.plugin-page-card > img { max-width:100%; max-height:240px; object-fit:contain; border-radius:var(--radius); margin-bottom:12px; }
+.plugin-page-card time { color:var(--text-secondary); font-size:12px; }
+.plugin-page-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+.plugin-page-actions:empty { display:none; }
+.plugin-page-actions [aria-disabled="true"] { opacity:.6; cursor:wait; }
+.plugin-page-actions button { min-height:40px; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.plugin-page-status { color:var(--text-secondary); font-size:14px; }
+.plugin-page-status:has(p:empty):not(:has(button)) { display:none; }
+.plugin-page-entries { display:contents; }
+.plugin-page-route { width:100%; max-width:1440px; margin:0 auto; }
+.plugin-page-route .media-dialog-body { overflow:visible; min-width:0; padding:0; }
+.plugin-page-route [hidden] { display:none !important; }
+.plugin-page-header { display:flex; align-items:center; justify-content:flex-start; gap:16px; margin-bottom:24px; }
+.plugin-page-header h1 { min-width:0; overflow-wrap:anywhere; }
+.plugin-page-header button { min-height:40px; flex-shrink:0; }
+.plugin-page-intro { display:flex; align-items:flex-start; gap:20px; padding:20px; margin-bottom:20px; border:1px solid var(--stroke); background:var(--surface); border-radius:var(--radius); }
+.plugin-page-intro > img { width:64px; height:64px; object-fit:cover; border-radius:50%; flex-shrink:0; }
+.plugin-page-intro p { margin:0; min-width:0; }
+.plugin-page-route .plugin-page-cards { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+.plugin-page-route .plugin-page-cards.is-list { grid-template-columns:minmax(0,1fr); }
+.plugin-card-author { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.plugin-card-author > div { min-width:0; overflow-wrap:anywhere; }
+.plugin-card-author time { display:block; margin-top:4px; }
+.plugin-card-author .comment-avatar { flex-shrink:0; }
+.plugin-card-images { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:16px; }
+.plugin-card-images:has(> :only-child) { grid-template-columns:minmax(0,1fr); }
+.plugin-image-button { border:0; background:var(--surface-secondary); padding:0; min-width:0; min-height:40px; border-radius:var(--radius); overflow:hidden; cursor:pointer; }
+.plugin-image-button img { display:block; width:100%; height:180px; object-fit:cover; }
+.plugin-image-button:only-child img { height:auto; max-height:400px; object-fit:contain; }
+.plugin-page-status { padding:12px 0; }
+.plugin-gallery[open] { animation:none; }
+.plugin-gallery { width:min(1080px,calc(100vw - 32px)); max-height:calc(100dvh - 100px); }
+.plugin-gallery header { display:flex; align-items:center; justify-content:space-between; }
+.plugin-gallery .media-dialog-body { overflow:auto; text-align:center; }
+.plugin-gallery .media-dialog-body img { display:block; max-width:100%; height:auto; margin:0 auto; }
+.plugin-gallery footer { display:flex; justify-content:space-between; gap:12px; padding:16px 20px; }
+.plugin-gallery button { min-height:40px; }
+@media(max-width:900px) { .plugin-page-route .plugin-page-cards { grid-template-columns:minmax(0,1fr); } .plugin-page-intro { padding:16px; gap:12px; } }
+@media(max-width:740px) { .plugin-page-dialog { width:calc(100vw - 24px); } .plugin-page-cards { grid-template-columns:minmax(0,1fr); } }
+@media(forced-colors:active) { .plugin-page-card { border-color:CanvasText; background:Canvas; } }
+/* Optional plugin navigation has its own bounded scroller; Settings and transport remain reachable. */
+#pluginNavigation { min-height:44px; max-height:28vh; overflow-y:auto; flex:1 1 auto; scrollbar-width:thin; }
+#pluginNavigation[hidden] { display:none; }
+#pluginNavigation .nav-item { min-height:40px; flex-shrink:0; width:100%; }
+#pluginNavigation .nav-item > span:last-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.plugin-page-tabs { display:flex; gap:8px; margin:4px 0 20px; padding:4px; overflow-x:auto; scrollbar-width:thin; }
+.plugin-page-tabs [role="tab"] { flex:0 0 auto; min-height:40px; position:relative; background:transparent; border-color:transparent; max-width:260px; white-space:normal; overflow-wrap:anywhere; }
+.plugin-page-tabs [role="tab"]:hover { background:var(--surface-hover); }
+.plugin-page-tabs [role="tab"][aria-selected="true"] { background:var(--surface); color:var(--text); }
+.plugin-page-tabs [role="tab"][aria-selected="true"]::after { content:""; position:absolute; height:3px; border-radius:2px; bottom:0; left:12px; right:12px; background:var(--accent); }
+.plugin-page-tabs [role="tab"]:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+@media (max-width:860px) { #pluginNavigation .nav-section-label,#pluginNavigation .nav-item > span:last-child { display:none; } #pluginNavigation .nav-item { justify-content:center; } }
+@media (forced-colors:active) { .plugin-page-tabs [role="tab"][aria-selected="true"] { border-color:Highlight; } }
+.plugin-page-query { display:flex; flex-wrap:wrap; align-items:end; gap:20px; padding:20px; margin:0 0 24px; border:1px solid var(--stroke); border-radius:var(--radius); background:var(--surface); }
+.plugin-query-field { flex:1 1 260px; min-width:0; padding:0; margin:0; border:0; }
+.plugin-query-field > label,.plugin-query-field > legend { display:block; margin-bottom:8px; font-weight:600; font-size:14px; padding:0; }
+.plugin-query-text { width:100%; min-width:0; height:40px; box-sizing:border-box; font-size:14px; }
+.plugin-query-choices { display:flex; flex-wrap:wrap; gap:8px; }
+.plugin-query-choices label { position:relative; cursor:pointer; min-width:0; }
+.plugin-query-choices input { position:absolute; opacity:0; width:1px; height:1px; }
+.plugin-query-choices span { display:block; padding:9px 14px; border:1px solid var(--stroke); border-radius:6px; overflow-wrap:anywhere; background:var(--surface-secondary); }
+.plugin-query-choices input:checked + span { color:var(--text); background:var(--accent-soft); border-color:var(--accent); }
+.plugin-query-choices input:focus-visible + span { outline:2px solid var(--accent); outline-offset:3px; }
+.plugin-query-submit { min-height:40px; flex:0 0 auto; }
+@media(max-width:700px) { .plugin-page-query { padding:16px; gap:16px; } .plugin-query-submit { width:100%; } }
+@media(forced-colors:active) { .plugin-query-choices input:checked + span { border:2px solid Highlight; color:Highlight; } }
+/* Media is a host control, not a provider navigation command. No motion on audio/queue changes. */
+.plugin-card-media { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding-top:12px; min-width:0; }
+.plugin-card-media > img { width:48px; height:48px; object-fit:cover; border-radius:6px; flex:none; }
+.plugin-card-media > div { min-width:0; flex:1 1 140px; overflow-wrap:anywhere; }
+.plugin-card-media strong,.plugin-card-media span { display:block; }
+.plugin-card-media span { color:var(--text-secondary); font-size:12px; margin-top:4px; }
+.plugin-page-actions button:disabled { opacity:.5; cursor:default; }

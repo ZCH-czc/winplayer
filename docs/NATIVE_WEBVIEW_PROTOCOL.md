@@ -1,5 +1,83 @@
 # Native ↔ WebView2 消息协议
 
+2026-09-13 第十三阶段：`pickPluginRecovery {requestId,id}` 是通用平台管理 action，沿用同源、安全整数、
+管理互斥和 `setPluginManagementResult` 回调。Native 单文件选择器提供路径；Web 不能提交路径或选择历史目录。
+管理器要求同一插件 ID、低于当前选择的版本、兼容清单与当前选择完整性通过；失败固定 `recoveryUnavailable`。
+成功返回原有 `batch`，仍用 `confirmPluginImport {requestId,token,trust:true}`，默认关闭、明确启用和重启。
+不是自动回滚，不恢复账号或设置，不保证该旧包曾安装过，也不接受开发工具计划中的命令。
+
+所有平台导入 preview 增加可选 `review:{kind,previousVersion?,previousPayloadSha256?,previousVerified,
+hostSdkVersion,accessReviewRequired,changes:[{kind,added,removed}]}`。kind 为 install/update/recovery/reinstall/unknown。
+changes 仅包含 providers/capabilities/pages/settings/features/credentials/settingAliases/artworkDomains 的声明文本。
+旧摘要是展开内容摘要，不是原 ZIP 摘要；绝不投影基线路径、入口程序集、实际凭据、设置值或媒体地址。
+兼容性由当前 Host 静态检查，不执行 DLL；不等于开发交付门禁通过或真实平台可用。
+Native 将预览绑定到此插件当前注册选择、启用偏好、完整性与内容摘要，单包/批次确认前重新核对；
+变化拒绝提交（批次 invalidPackage），必须重新选择并审阅。其它独立插件的批次提交不使该基线失效。
+无关 inventory 刷新保留同 token 审阅展开/信任状态；新 token、开始提交或失败后重建并重置批准。
+离开管理页撤销未提交预览，迟到的选择结果会发送 cancel；Native 先释放管理互斥标志，再发送结果回调，
+避免该回调立即触发的取消被旧操作的 busy 标志丢弃。已提交的安装不因离开而回滚。
+新增 Native action 与 Web 资源需成套基础播放器更新；平台 SDK 2.10 / API / schema / Abstractions 不变。
+
+2026-09-13 Pages v6（Host SDK 2.10）在 setPluginPage.page.cards[] 增加可选 media（既有 OnlineTrackView）。
+handle/id 是 Native 随机 track 句柄，coverUrl 为宿主代理，只有公开标题/作者/专辑/时长/可用性等元数据。
+不是原始 PlatformTrack 序列化；平台实体、流地址、认证、图片源域名均不传给主 Web。
+Play 沿用 playPlatformResult {handle}，成功/失败沿用 setPlatformPlaybackResult；没有新通用命令。
+Add to queue 仅编辑 Web 的混合队列，依实际下一首的既有计划触发 prefetchPlatformTrack，而不是遍历页面。
+Native 在页面投影、取流前后和预取上下文校验提供方、能力与修订；页面浏览本身没有播放授权。
+action 仍只读。无插件/旧页面/不可用作品不出现可操作的新入口；详见 PLUGIN_PAGES.md。
+
+2026-09-13 Pages v5（Host SDK 2.9）**不新增 Web 消息或 Target 字段**。
+readPluginPage / readPluginGlobalPage 与 setPluginPage 保持原来的来源 handle/providerId、entryId、requestId。
+一个来源页面的所有后续读取仍携带来源 envelope；Native 通过 navigationHandle 解析真实目标实体与入口，
+并按目标入口校验文档版本。外部传入的原始实体、目标路由或强制播放意图没有对应协议。
+只读动作投影仍是 {label,handle}；新的实体跳转清空源查询输入，后续标签/分页继承目标上下文。
+返回继续使用原有句柄历史、重新读取来源，不暴露平台 ID，也不改变播放状态。边界详见 PLUGIN_PAGES.md。
+
+2026-09-13 Settings v2（Host SDK 2.8）不新增命令。setPlatformConfiguration 和
+setOnlineProviderSettingResult.settings 的 setting 投影增加：
+labelEn、descriptionEn、choices[].labelEn、group? {id,label,labelEn,description,descriptionEn}、
+when? {key,value,hint,hintEn}、enabled（Native 基于已保存快照计算）。
+saveOnlineProviderSetting 仍为 {requestId,providerId,key,value}；不接受脚本或任意依赖表达式。
+Native 和 scoped store 同时验证声明与适用条件；必填检查仅作用于 enabled 项。
+UI 不向插件传 when/group；这些只来自可信已校验清单。停用/条件改变后迟到回执不得重新启用字段。
+未满足条件的非敏感原值可以显示给用户，但插件 IPlatformSettings.GetAsync 返回 null。
+保存成功才更新条件和控件；错误保留草稿。纯文本变化不构成新设置定义。
+
+2026-09-13 第三阶段开发：readPluginGlobalPage {providerId,entryId,navigationHandle?,language,requestId}
+使用相同 plugin-page 取消槽与 setPluginPage 回调，回调附 providerId、handle:null。仅清单声明
+GlobalPages 且 placement:global / presentation:page / documentVersion:3 的入口可读取；
+没有媒体 ID，也不能将媒体/作者导航句柄用于全局页面。发现和侧栏投影不执行页面读取。
+Pages v3 投影 tabs:[{action:{label,handle},selected}]，标签只读导航仍使用不透明句柄；原始 route/state 不进入 Web。
+下一批追加不能带 tabs，不改变当前分区。切标签成功才提交选中状态；失败保留旧内容/标签并提供重试。
+返回、配置修订、停用和离页取消等待，旧响应不能切回旧分区。Tabs 不代表任意脚本、账号写入或播放命令。
+
+2026-09-13 第二阶段：readPluginPage 消息不变；入口声明 documentVersion:2、presentation:page/dialog、
+acceptsCreatorContext 后，Native 可解析精确作者句柄，不能由 Web 指定原始实体或 ContextKind。
+页面投影追加 image、append、collectionHandle、next；卡片追加 handle、author、avatar、images、
+discussionHandle、commentCount。next 为带 label/handle 的只读追加导航，普通 actions 仍替换页面。
+append 与 collectionHandle 由 Native 绑定，不信任 Web 自报。动态讨论复用 comments/replies 右侧抽屉协议。
+归属、循环游标、资源上限及版本门槛见 [PLUGIN_PAGES.md](PLUGIN_PAGES.md)。
+
+2026-09-13 作者搜索：`searchPlatformCreators {providerId,query,requestId,pageHandle?}` →
+`setCreatorSearchResult {providerId,query,requestId,pageHandle,items,nextPageHandle,totalCount,error}`。
+正安全整数 requestId、query 最长 512；仅 CreatorSearch 能力可调用。取消使用 creator-search 槽位。
+items 为 `{handle,displayName,description,avatarUrl}`，不是可播放 track；UID/cursor 不进入 Web。
+分页绑定 provider/query/账号与设置修订，30 分钟和 512 项搜索引用上限；读取预算 Native 30 秒 / Web 35 秒。
+creator 请求既接受既有媒体句柄，也接受当前搜索返回的 creator 句柄；不能将作者句柄用于播放。
+动态主页面 route 为 creator，共用主内容滚动与页面动效，返回保留搜索词、结果、滚动和可见按钮焦点。
+插件缺失/停用/修订变更、离页和新 query 拒绝旧响应；完整边界见 CREATOR_COMMUNITY.md。
+
+2026-09-13：新增 readPluginPage / setPluginPage，配置新增 pages / pageRevision，使用现有 cancelPlatformExtras 的 plugin-page 槽位。
+入口、句柄归属、只读操作、限制和回调形状详见 [声明式页面契约](PLUGIN_PAGES.md)。不开放任意脚本或原生命令。
+
+CreatorProfile 与 CreatorFeed 均可使用 creator 请求；只有 CreatorFeed 发送 feed。
+预取复用原有 prefetchPlatformTrack 消息，缓存上下文、原始实体和授权仍只在 Native。
+
+2026-09-12：`requestPlatformExtras` 新增 creator/feed/replies；comments 增加 sort 并接受受控动态讨论句柄。
+replies 额外携带 rootHandle；正安全整数 requestId，分页绑定 subject/root/sort/kind，不传平台原始 ID。
+回调仍匹配 handle/kind/requestId，评论新增句柄/回复数/被回复人，日期保留原字段。
+完整投影、取消与兼容约束见 [CREATOR_COMMUNITY.md](CREATOR_COMMUNITY.md)。
+
 2026-09-08：setPlatformConfiguration的能力投影也约束全屏扩展生命周期。丢失Comments/MediaExtras时用已有cancelPlatformExtras
 取消对应等待、关闭对应面板并拒绝迟到回复；丢失VideoResolution或必填配置时，用已有setEmbeddedVideo(enabled:false)
 取消准备中的切换。已生效的播放租约不因Web配置变化而停止；新评论/视频请求仍需当前能力。没有新增平台专属消息或公开媒体地址。
@@ -707,3 +785,19 @@ FLAC 平均编码码率在标签中用“≈”区分，采样率、位深及声
 - [ ] 两端实现、本文与自动测试同提交更新。
 - [ ] LAN API 仍是默认关闭、仅本地库、私有地址和固定静态资源；没有绝对路径或在线平台材料。
 - [ ] pairing token 未进日志/持久化/query，交换后从地址栏清除；stop/exit/rebind/revoke 清 session。
+
+## Pages v4 query inputs (development Host SDK 2.7)
+
+`readPluginPage` / `readPluginGlobalPage` optionally accept `inputValues`, a JSON object
+of at most four distinct bounded keys and single-line strings (at most 256 UTF-16 units each).
+Values are accepted only with an opaque navigation handle projected from a validated Pages v4
+query form. Native checks exact field membership, minimum/maximum length and explicit choice
+membership before routing. Ordinary navigation must omit inputValues; it inherits an immutable
+backend query snapshot. Initial reads cannot submit input. No arbitrary route or state is accepted.
+Query is read-only: no account writes, passwords, uploads or native commands. Nothing is persisted
+or logged. Revision/entry/provider ownership, cancellation and requestId guards are unchanged.
+
+The page projection adds optional `query: { submit: { label, handle }, fields: [...] }`.
+Only public field definitions, defaults and choices reach WebView; submit route/state remain native.
+The renderer submits only on explicit Enter/button activation, preserves bounded in-memory query
+snapshots for back/retry, and rejects query forms on appended batches.

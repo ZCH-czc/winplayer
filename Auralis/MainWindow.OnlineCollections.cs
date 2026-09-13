@@ -20,10 +20,12 @@ public partial class MainWindow
         {
             var backend = ((App)System.Windows.Application.Current).PlatformBackend;
             await backend.SaveSettingAsync(providerId, key, value, timeout.Token);
+            ++_prefetchVersion;
+            await DrainPrefetchAsync(null);
             var registration = (await backend.DiscoverAsync(timeout.Token)).Providers.First(p => p.Provider.Id == providerId);
             var actual = await backend.ReadSettingsAsync(registration, timeout.Token);
             settings = actual;
-            configured = actual.All(s => !s.Required || s.Value.Length > 0);
+            configured = actual.All(s => !s.Enabled || !s.Required || s.Value.Length > 0);
         }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.IO.IOException or UnauthorizedAccessException or OperationCanceledException)
         { error = "无法保存插件设置，请检查输入或插件状态后重试。"; }

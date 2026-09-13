@@ -106,12 +106,14 @@ public sealed record PlatformProviderManifest
         IReadOnlyCollection<PlatformCapabilityKind> capabilities,
         IReadOnlyList<PlatformSettingManifest>? settings = null,
         PlatformCommentArtworkPolicy? commentArtworkPolicy = null,
-        bool usesLegacyCommentArtworkPolicy = false)
+        bool usesLegacyCommentArtworkPolicy = false,
+        IReadOnlyList<PlatformPageEntry>? pages = null)
     {
         Id = id;
         DisplayName = displayName;
         Capabilities = capabilities;
-        Settings = settings ?? [];
+        Settings = Array.AsReadOnly((settings ?? []).Select(s => s.Snapshot()).ToArray());
+        Pages = Array.AsReadOnly((pages ?? []).ToArray());
         CommentArtworkPolicy = commentArtworkPolicy ?? PlatformCommentArtworkPolicy.DenyAll;
         UsesLegacyCommentArtworkPolicy = usesLegacyCommentArtworkPolicy;
     }
@@ -126,6 +128,7 @@ public sealed record PlatformProviderManifest
     public IReadOnlyCollection<PlatformCapabilityKind> Capabilities { get; }
 
     public IReadOnlyList<PlatformSettingManifest> Settings { get; }
+    public IReadOnlyList<PlatformPageEntry> Pages { get; }
     public PlatformCommentArtworkPolicy CommentArtworkPolicy { get; }
     /// <summary>Historical field: true means schema 1–4 omitted explicit policy. The policy is deny-all, not implicit CDN access.</summary>
     public bool UsesLegacyCommentArtworkPolicy { get; }

@@ -1,6 +1,48 @@
 # 插件与 Host SDK 兼容性（schema 5）
 
-## 当前规则：Host SDK 2.0.0 / 自检工具 1.2.0
+当前开发 SDK **2.10.0 / Abstractions 1.11.0**：Pages v6 增加归一化作品卡片。
+documentVersion:6 必须声明 SDK 2.10 与 declarative-pages.v1 至 v6；旧 SDK 2.9 加载前拒绝。
+平台需声明 StreamResolution，页面 action 仍只读；API/schema/程序集身份保持。
+Bilibili 开发插件 1.18.0、QQ 1.16.0 采用 v6，均要求 SDK 2.10；网关 1.12.0 不变。
+QQ 1.16 在 1.15 的目录页面上增加独立发现与音乐人搜索，只更新插件，未增加 SDK 版本或公开核心运行功能。
+固定宿主兼容性通过不代表线上可用性；QQ 搜索最终匿名复验的 ServiceUnavailable 仍记为未通过。
+旧签名安装版尚未更新；不要仅导入新包或手改清单冒充兼容。详见 PLUGIN_PAGES.md。
+
+历史第六阶段 SDK **2.9.0 / Abstractions 1.10.0**：第六阶段新增 Pages v5 类型化实体导航。
+源入口 documentVersion:5 必须声明 SDK 2.9 及 declarative-pages.v1/v2/v3/v4/v5；旧 SDK 2.8 在加载前拒绝。
+API 1 / schema 5 / 程序集身份不变。Bilibili 开发包 1.17.0 采用此契约；QQ 1.14.0、网关 1.12.0 不变。
+不能把新包导入旧 SDK 2.2 签名安装版；本轮未改动已安装应用。行为与验证见 PLUGIN_PAGES.md。
+
+第五阶段 SDK **2.8.0 / Abstractions 1.9.0**：第五阶段新增 settings.v2。
+分组、英文说明或 when 条件必须要求 SDK 2.8 与 settings.v1/v2；旧字段仍兼容，API/schema/程序集身份不变。
+原生 scoped store 与 UI 共用声明和原子条件快照。插件业务读取不到暂不适用的配置。
+QQ 私人插件 1.14.0、网关 1.12.0 采用此契约；Bilibili 1.16.0 保持 SDK 2.7 下限。
+当前签名安装包不因此自动升级；详见 [设置契约与证据](PLUGIN_SETTINGS.md)。
+
+第四阶段 SDK **2.7.0 / Abstractions 1.9.0**：第四阶段新增 Pages v4 的只读查询/选项筛选。
+documentVersion:4 要求 declarative-pages.v1/v2/v3/v4；全局页另需 GlobalPages/global-pages.v1。
+旧 SDK 2.6 拒绝此包；API 1、schema 5 与程序集身份不变。输入仅可通过宿主签发的表单句柄提交，
+旧 Pages v1/v2/v3 和既有构造器仍兼容；新控件词汇依旧可能需要基础宿主更新，不能宣称永远无需更新。
+
+历史开发 SDK **2.6.0 / Abstractions 1.8.0**：第三阶段新增 GlobalPages / global-pages.v1，
+以及 documentVersion:3 / declarative-pages.v3 标签分区。全局入口必须声明 Pages + GlobalPages、
+presentation:page、documentVersion:3 和 v1/v2/v3 feature；旧 SDK 2.5 会拒绝新包。
+程序集身份和既有 API 构造器不变；不能仅修改 manifest 使旧 DLL 冒充实现了新能力。
+
+历史 SDK **2.5.0 / Abstractions 1.7.0**。Pages 第二阶段新增 declarative-pages.v2；
+入口 documentVersion 为 2 时必须要求该 feature。presentation:page / acceptsCreatorContext 也必须声明版本 2。
+版本 1 默认 dialog，仍可使用；返回文档版本不能超过入口声明版本。API 1、schema 5 与程序集身份不变。
+已经签名的 SDK 2.2 安装包不能导入本轮新插件；需要新版基础宿主后，契约内页面才能仅更新插件。
+
+2026-09-13 当前开发 SDK **2.4.0 / Abstractions 1.6.0**：增加 `CreatorSearch` / `creator-search.v1`。
+新增枚举追加到末尾，不改变既有编号/程序集身份/API。声明该能力必须显式要求其 host feature。
+旧 SDK 2.2/2.3 不支持作者搜索插件的新版本；不要仅修改清单绕过检查。本轮没有发布新安装包。
+
+## 页面契约引入：Host SDK 2.3.0 / 自检工具 1.2.0
+
+2.3.0 新增 declarative-pages.v1（Pages），Abstractions 1.5.0，程序集身份和 API 1 不变。
+清单仍为 schema 5；新增 pages 必须与 Pages 能力及 requiredFeatures 成套声明。旧已签名 0.16.11 包的 SDK 2.2 不支持此能力。
+见 [声明式页面](PLUGIN_PAGES.md)。下方 2.0/1.2 为历史特性记录。
 
 2026-09-08：公共 Host 的隐式平台凭据表与评论图片域名表已移除。当前播放器运行/导入最低 schema 为 5；
 现有 schema 5 私人六包 1.11.0 的最低 SDK 1.2.0 仍满足，无需仅为 Host 2.0 修改接口、DLL 或最低版本。

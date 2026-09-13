@@ -67,7 +67,25 @@ public enum PlatformCapabilityKind
     NativeLogin,
 
     /// <summary>Opt-in local-song lyric matching via <see cref="IPlatformLyricsLookupCapability"/>.</summary>
-    LyricsLookup
+    LyricsLookup,
+
+    /// <summary>Creator profiles and paged activity via <see cref="ICreatorFeedCapability"/>.</summary>
+    CreatorFeed,
+
+    /// <summary>Paged comment threads via <see cref="ICommentRepliesCapability"/>.</summary>
+    CommentReplies,
+
+    /// <summary>Standalone creator metadata via <see cref="ICreatorProfileCapability"/>.</summary>
+    CreatorProfile,
+
+    /// <summary>Read-only declarative pages via <see cref="IPlatformPagesCapability"/>.</summary>
+    Pages,
+
+    /// <summary>Read-only creator search via <see cref="ICreatorSearchCapability"/>.</summary>
+    CreatorSearch,
+
+    /// <summary>Provider-level pages via <see cref="IPlatformGlobalPagesCapability"/>.</summary>
+    GlobalPages
 }
 
 /// <summary>Describes one independently addressable online provider.</summary>

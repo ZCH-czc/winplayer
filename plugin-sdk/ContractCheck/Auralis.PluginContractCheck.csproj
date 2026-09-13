@@ -8,7 +8,12 @@
     <Version>1.2.0</Version>
     <NuGetAudit>false</NuGetAudit>
   </PropertyGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(FrozenCore)' == ''">
     <ProjectReference Include="../../Auralis.Platform.Host/Auralis.Platform.Host.csproj" />
+  </ItemGroup>
+  <!-- Delivery checks must use the SDK from the selected publish, not rebuild a lookalike. -->
+  <ItemGroup Condition="'$(FrozenCore)' != ''">
+    <Reference Include="Auralis.Platform.Host"><HintPath>$(FrozenCore)/Auralis.Platform.Host.dll</HintPath></Reference>
+    <Reference Include="Auralis.Platform.Abstractions"><HintPath>$(FrozenCore)/Auralis.Platform.Abstractions.dll</HintPath></Reference>
   </ItemGroup>
 </Project>

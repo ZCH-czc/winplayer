@@ -419,6 +419,16 @@ public sealed class PlatformPluginCatalog
             if (!IsValidId(provider.Id) || !IsValidDisplayName(provider.DisplayName) ||
                 provider.Capabilities is null || provider.Capabilities.Count == 0 ||
                 !PlatformSettingManifest.IsValidList(provider.Settings) ||
+                (provider.Settings?.Any(s => s.UsesV2) == true && (document.SchemaVersion < 5 ||
+                    document.HostRequirements is null || new Version(document.HostRequirements.MinimumHostSdkVersion) < new Version(2, 8, 0))) ||
+                !PlatformPageEntry.IsValidList(provider.Pages) ||
+                (provider.Pages?.Any(e => e.DocumentVersion >= 6) == true &&
+                    (document.HostRequirements is null || new Version(document.HostRequirements.MinimumHostSdkVersion) < new Version(2, 10, 0))) ||
+                (provider.Pages?.Any(e => e.DocumentVersion >= 5) == true &&
+                    (document.HostRequirements is null || new Version(document.HostRequirements.MinimumHostSdkVersion) < new Version(2, 9, 0))) ||
+                (provider.Pages?.Count > 0 && document.SchemaVersion < 5) ||
+                ((provider.Pages?.Count > 0) != provider.Capabilities.Contains(PlatformCapabilityKind.Pages)) ||
+                ((provider.Pages?.Any(e => e.Placement == "global") == true) != provider.Capabilities.Contains(PlatformCapabilityKind.GlobalPages)) ||
                 (provider.Settings?.Any(s => !settingKeys.Add(s.Key)) == true) ||
                 (provider.Settings?.Count > 0 && document.SchemaVersion < 2))
             {
@@ -446,7 +456,7 @@ public sealed class PlatformPluginCatalog
             providers.Add(new PlatformProviderManifest(
                 provider.Id!,
                 provider.DisplayName!,
-                new ReadOnlyCollection<PlatformCapabilityKind>(capabilities), provider.Settings, artworkPolicy, legacyArtwork));
+                new ReadOnlyCollection<PlatformCapabilityKind>(capabilities), provider.Settings, artworkPolicy, legacyArtwork, provider.Pages));
         }
 
         if (!PlatformCredentialAlias.IsValidList(document.CredentialAliases) ||
@@ -462,10 +472,25 @@ public sealed class PlatformPluginCatalog
             var needed = new List<string>();
             if (document.SchemaVersion >= 5) needed.Add("comment-artwork.v1");
             if (providers.Any(p => p.Settings.Count > 0)) needed.Add("settings.v1");
+            if (providers.Any(p => p.Settings.Any(s => s.UsesV2))) needed.Add("settings.v2");
+            if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 2)))
+                needed.Add("declarative-pages.v2");
+            if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 3)))
+                needed.Add("declarative-pages.v3");
+            if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 4)))
+                needed.Add("declarative-pages.v4");
+            if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 5)))
+                needed.Add("declarative-pages.v5");
+            if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 6)))
+                needed.Add("declarative-pages.v6");
             if (document.CredentialAliases?.Count > 0) needed.Add("credential-aliases.v1");
             foreach (var (kind, feature) in new[] {
                 (PlatformCapabilityKind.NativeLogin, "native-login.v1"), (PlatformCapabilityKind.TrackDetails, "track-details.v1"),
-                (PlatformCapabilityKind.LyricsLookup, "lyrics-lookup.v1"), (PlatformCapabilityKind.VideoResolution, "video-lease.v2") })
+                (PlatformCapabilityKind.LyricsLookup, "lyrics-lookup.v1"), (PlatformCapabilityKind.VideoResolution, "video-lease.v2"),
+                (PlatformCapabilityKind.Pages, "declarative-pages.v1"),
+                (PlatformCapabilityKind.GlobalPages, "global-pages.v1"),
+                (PlatformCapabilityKind.CreatorSearch, "creator-search.v1"),
+                (PlatformCapabilityKind.CreatorProfile, "creator-profile.v1"), (PlatformCapabilityKind.CreatorFeed, "creator-feed.v1"), (PlatformCapabilityKind.CommentReplies, "comment-replies.v1") })
                 if (providers.Any(p => p.Capabilities.Contains(kind))) needed.Add(feature);
             if (needed.Any(f => !declared.RequiredFeatures.Contains(f, StringComparer.Ordinal)))
             {
@@ -619,6 +644,9 @@ public sealed class PlatformPluginCatalog
 
         [JsonPropertyName("settings")]
         public List<PlatformSettingManifest>? Settings { get; init; }
+
+        [JsonPropertyName("pages")]
+        public List<PlatformPageEntry>? Pages { get; init; }
 
         [JsonPropertyName("commentArtworkDomains")]
         public List<string>? CommentArtworkDomains { get; init; }

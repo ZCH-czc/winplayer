@@ -45,3 +45,52 @@ test('pending replacement suppresses prefetch and auto-advance',()=>{
   const f=fixture({platformPlayback:{pendingHandle:'c'}});f.run('syncNextPrefetch();playNext(1,true)');
   assert.equal(f.messages.length,0);assert.equal(f.played.length,0);
 });
+
+test('pause or pending replacement cancels an existing speculative target',()=>{
+  for(const change of [f=>f.state.isPlaying=false,f=>f.state.platformPlayback.pendingHandle='c']){
+    const f=fixture();f.run('syncNextPrefetch()');change(f);f.run('syncNextPrefetch();syncNextPrefetch()');
+    assert.deepEqual(f.messages.map(m=>m.handle),['b','']);
+    f.state.isPlaying=true;f.state.platformPlayback.pendingHandle='';f.run('syncNextPrefetch()');
+    assert.equal(f.messages.at(-1).handle,'b');
+  }
+});
+
+test('decoder ended or matching next request preserves prepared successor',()=>{
+  const f=fixture();f.run('syncNextPrefetch()');
+  f.state.duration=120;f.state.currentTime=120;f.state.isPlaying=false;f.run('syncNextPrefetch()');
+  f.state.platformPlayback.pendingHandle='b';f.run('syncNextPrefetch()');
+  assert.deepEqual(f.messages.map(m=>m.handle),['b']);
+});
+const selection=source.slice(source.indexOf('  function selectPageMedia('),source.indexOf('  function playMixedItem('));
+function pageSelection(options={}) {
+  const local={id:'local',kind:'local'},work={id:'work',handle:'work',kind:'online'},calls=[],toasts=[];
+  const state={tracks:[local],currentTrackId:'local',currentIndex:0,currentTime:42,isPlaying:true,queueKind:'local',
+    mixedQueue:[],onlineQueue:[],platformPlayback:{pendingHandle:'',pendingQueue:[]},...options};
+  const context=vm.createContext({state,currentPlatformCapabilities:()=>['StreamResolution'],
+    activePlaybackQueue:()=>state.queueKind==='mixed'?state.mixedQueue:state.queueKind==='online'?state.onlineQueue:state.tracks,
+    requestPlatformPlayback:(...args)=>calls.push(args),renderQueue:()=>{},syncNextPrefetch:()=>{},
+    showToast:text=>toasts.push(text),work});
+  vm.runInContext(selection,context);
+  return {state,calls,toasts,run:code=>vm.runInContext(code,context)};
+}
+test('page enqueue preserves local playback, appends once and never starts a lease',()=>{
+  const f=pageSelection();f.run('selectPageMedia(work);selectPageMedia(work)');
+  assert.equal(f.state.currentTrackId,'local');assert.equal(f.state.currentTime,42);assert.equal(f.state.isPlaying,true);
+  assert.deepEqual(Array.from(f.state.mixedQueue,t=>t.id),['local','work']);assert.equal(f.calls.length,0);
+  assert.equal(f.state.tracks.length,1,'online media never enters local library');
+});
+test('page enqueue with empty playback does not implicitly enqueue local library',()=>{
+  const f=pageSelection({currentTrackId:'',isPlaying:false});f.run('selectPageMedia(work)');
+  assert.deepEqual(Array.from(f.state.mixedQueue,t=>t.id),['work']);assert.equal(f.calls.length,0);assert.equal(f.state.currentTrackId,'');
+});
+test('page play uses existing pending playback commit, failure cannot replace current queue',()=>{
+  const f=pageSelection();f.run('selectPageMedia(work,true)');
+  assert.equal(f.calls.length,1);assert.equal(f.calls[0][2],'mixed');assert.equal(f.state.queueKind,'local');
+  assert.equal(f.state.currentTrackId,'local');assert.equal(f.state.currentTime,42);
+});
+test('enqueue survives an in-flight replacement and unavailable media stays inert',()=>{
+  const f=pageSelection({platformPlayback:{pendingHandle:'next',pendingQueue:[{id:'next',kind:'online'}]}});
+  f.run('selectPageMedia(work);selectPageMedia({...work,id:"blocked",unavailable:true})');
+  assert.deepEqual(Array.from(f.state.platformPlayback.pendingQueue,t=>t.id),['next','work']);
+  assert.equal(f.state.platformPlayback.pendingQueueKind,'mixed');assert.equal(f.state.mixedQueue.length,2);assert.equal(f.calls.length,0);
+});

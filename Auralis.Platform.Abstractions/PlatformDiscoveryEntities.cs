@@ -230,6 +230,8 @@ public sealed record PlatformCommentAuthor
 /// <summary>Represents one sanitized provider comment.</summary>
 public sealed record PlatformComment
 {
+    /// <summary>Optional plain display name of the reply recipient. No executable markup.</summary>
+    public string? ReplyToAuthor { get; init; }
     /// <summary>Optional public emoji artwork keyed by an exact plain-text token; never HTML.</summary>
     public IReadOnlyList<PlatformCommentEmote> Emotes { get; init; } = [];
     /// <summary>Gets the provider-qualified comment ID.</summary>

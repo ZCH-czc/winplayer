@@ -25,6 +25,9 @@ public partial class MainWindow
             return;
         }
         if (_openingPlatformLogins.ContainsKey(providerId) || _windowClosed) return;
+        ((App)System.Windows.Application.Current).PlatformBackend.InvalidateMediaContext(providerId);
+        ++_prefetchVersion;
+        await DrainPrefetchAsync(null);
         using var cancellation = new CancellationTokenSource();
         var generation = new object();
         _platformLoginGenerations[providerId] = generation;
@@ -48,6 +51,7 @@ public partial class MainWindow
             _platformLogins[providerId] = session;
             session.Authenticated += (_, _) => Dispatcher.BeginInvoke(async () =>
             {
+                ((App)System.Windows.Application.Current).PlatformBackend.InvalidateMediaContext(providerId);
                 // Auto-closing the successful login window must not drop its queued refresh.
                 // A new login or explicit sign-out invalidates this generation.
                 if (!_windowClosed && _platformLoginGenerations.TryGetValue(providerId, out var active) && ReferenceEquals(active, generation))
@@ -89,9 +93,13 @@ public partial class MainWindow
         if (_openingPlatformLogins.Remove(providerId, out var pending)) CancelPlatformLogin(pending);
         if (_platformLogins.Remove(providerId, out var session)) ClosePlatformLoginSession(session);
         var backend = ((App)System.Windows.Application.Current).PlatformBackend;
+        backend.InvalidateMediaContext(providerId);
         var router = backend.Router;
+        ++_prefetchVersion;
+        await DrainPrefetchAsync(null);
         var ownerHandle = new WindowInteropHelper(this).Handle;
         var result = await router.SignOutAsync(providerId, CancellationToken.None);
+        backend.InvalidateMediaContext(providerId);
         if (!result.IsSuccess) { await ShowPlatformLoginErrorAsync("未能断开平台账号，请检查插件后重试。"); return; }
         var provider = (await backend.DiscoverAsync()).Providers.FirstOrDefault(p =>
             p.Provider.Id.Equals(providerId, StringComparison.OrdinalIgnoreCase));

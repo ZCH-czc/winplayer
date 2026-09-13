@@ -1,5 +1,44 @@
 # Auralis.Platform.Host
 
+Development SDK 2.10.0 validates Pages v6 media schemas, mandatory feature declarations and SDK floor before activation.
+The Native coordinator projects revision-bound media handles, enforces provider/artwork boundaries and reuses stream resolution.
+Browsing never prepares audio. No platform branches or executable page actions are introduced; old Pages remain supported.
+See [page contract](../docs/PLUGIN_PAGES.md).
+
+Development SDK 2.9.0 validates Pages v5 entity-navigation declarations and the minimum SDK floor.
+Native resolves same-provider target entry/entity/kind behind opaque source-bound handles. It validates
+the whole document before projection; Next/tabs/query cannot silently change entities. Older Pages remain
+compatible, with no assembly identity change. See [page contract](../docs/PLUGIN_PAGES.md).
+
+Development SDK 2.8.0 adds settings.v2: plugin-declared groups, bilingual labels and a bounded
+single-choice condition. Discovery validates and freezes metadata without loading providers.
+The shared scoped store validates conditions atomically, retains inactive preferences for the UI,
+and withholds them from plugin reads. settings.v1 and the stable assembly identity remain compatible.
+See [settings contract](../docs/PLUGIN_SETTINGS.md) for the frozen-host plugin-only upgrade proof.
+
+Development SDK 2.7.0 adds declarative-pages.v4: bounded read-only query schemas, input validation,
+inert version/feature gating and immutable navigation snapshots. The native coordinator owns opaque
+submit handles; ordinary actions cannot inject new field values. Pages v1/v2/v3 remain compatible.
+See docs/PLUGIN_PAGES.md for the new query/filter frozen-host proof and its limits.
+
+Development SDK 2.6.0 adds global-pages.v1 and declarative-pages.v3. Global entries require an explicit
+capability/interface, main-page presentation and v3 documents; discovery remains metadata-only.
+Tabs are bounded read-only navigation. Old media/creator Pages and assembly identities remain compatible.
+See docs/PLUGIN_PAGES.md for the frozen-host plugin-only upgrade proof and limits.
+
+Development SDK 2.5.0 adds declarative-pages.v2: inert presentation/context declarations and strict v1/v2
+document validation. The native coordinator binds append collections, discussions and creator identities.
+The core still contains no platform endpoints, HTML from plugins, or implicit account writes.
+
+Development SDK 2.4.0 adds creator-search.v1 and generic creator search routing/compatibility checks.
+See [creator community](../docs/CREATOR_COMMUNITY.md); no provider-specific HTTP or parsing is in this host.
+
+Development SDK 2.3.0 adds declarative-pages.v1, inert page-entry metadata and bounded document validation.
+See [page contract](../docs/PLUGIN_PAGES.md). Existing capabilities retain their compatibility paths.
+
+Development SDK 2.2.0 adds creator-profile.v1; 2.1.0 adds creator-feed.v1 and comment-replies.v1.
+The manifest capability and implemented interface must agree. See docs/CREATOR_COMMUNITY.md.
+
 Host SDK 2.0.0 supports schema 5 explicit per-provider `commentArtworkDomains` and `comment-artwork.v1`, plus schema 4 host requirements.
 Current Auralis and the default plugin manager require schema 5 for activation/import. Installed older packages remain visible
 as `upgradeRequired`; an explicit reviewed upgrade remains OFF until enabled and restarted. Old state/accounts are not rewritten.

@@ -16,7 +16,8 @@ internal static class CoordinatorRoutingTests
         File.Copy(typeof(RoutingPlugin).Assembly.Location, Path.Combine(plugin, "Fixture.dll"));
         var providers = new[] { "custom.public", "custom.account", "custom.configured", "custom.authonly" }.Select(id => new
         {
-            id, displayName = "Declared " + id, commentArtworkDomains = Array.Empty<string>(),
+            id, displayName = "Declared " + id, commentArtworkDomains = new[] { "art.example.test" },
+            pages = id == "custom.public" ? new[]{new PlatformPageEntry{Id="start",Label="页面",LabelEn="Page"},new PlatformPageEntry{Id="other",Label="其他",LabelEn="Other"},new PlatformPageEntry{Id="feed",Label="动态",LabelEn="Feed",Placement="creator",Presentation="page",AcceptsCreatorContext=true,DocumentVersion=6},new PlatformPageEntry{Id="hub",Label="插件主页",LabelEn="Plugin home",Placement="global",Presentation="page",DocumentVersion=3},new PlatformPageEntry{Id="query",Label="查询",LabelEn="Query",Placement="global",Presentation="page",DocumentVersion=6},new PlatformPageEntry{Id="work",Label="作品",LabelEn="Work",Presentation="page",DocumentVersion=6},new PlatformPageEntry{Id="legacy-work",Label="旧作品",LabelEn="Legacy work",Presentation="page",DocumentVersion=2}} : [],
             capabilities = RoutingProvider.Capabilities(id).Select(c => c.ToString()).ToArray(),
             settings = id == "custom.account"
                 ? new[] { new PlatformSettingManifest { Key="mode",Label="Mode",Kind="choice",DefaultValue="signedin",Choices=[new("signedin","In"),new("signedout","Out"),new("failed","Failure")] } }
@@ -27,7 +28,7 @@ internal static class CoordinatorRoutingTests
         await File.WriteAllTextAsync(Path.Combine(plugin, "platform.plugin.json"), JsonSerializer.Serialize(new
         {
             schemaVersion=5,id="tests.routing",displayName="Routing",version="1.0.0", minimumHostApiVersion=1,maximumHostApiVersion=1,
-            hostRequirements = new PlatformHostRequirements { MinimumHostSdkVersion = PlatformHostCompatibility.SdkVersion, RequiredFeatures = ["comment-artwork.v1", "settings.v1", "track-details.v1"] },
+            hostRequirements = new PlatformHostRequirements { MinimumHostSdkVersion = PlatformHostCompatibility.SdkVersion, RequiredFeatures = ["global-pages.v1", "declarative-pages.v3", "declarative-pages.v4", "declarative-pages.v5", "declarative-pages.v6", "declarative-pages.v2", "declarative-pages.v1", "creator-profile.v1", "comment-artwork.v1", "settings.v1", "track-details.v1", "creator-search.v1", "creator-feed.v1", "comment-replies.v1"] },
             entryAssembly="Fixture.dll",entryType="Auralis.Platform.Host.Tests.RoutingPlugin", providers
         }));
         var hashes = Directory.GetFiles(plugin).ToDictionary(f => Path.GetFileName(f)!, f => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(f))));
@@ -43,10 +44,27 @@ internal static class CoordinatorRoutingTests
         var result = await coordinator.SearchAsync("custom.public", "query", 20, null, default);
         Check(result.IsSuccess && result.Value.Items.Single().SourceName == "Declared custom.public", "Arbitrary provider searches via real Native coordinator and manifest display name");
         Check(result.Value.NextPageHandle is not null && result.Value.NextPageHandle != "private-cursor", "Opaque pagination");
+        await CommunityRoutingTests.RunAsync(coordinator, result.Value.Items.Single().Handle);
+        await PluginPageTests.RunAsync(coordinator, backend, result.Value.Items.Single().Handle);
         var page = await coordinator.SearchAsync("custom.public", "query", 20, result.Value.NextPageHandle, default);
         Check(page.IsSuccess && page.Value.Items.Single().Title == "Second", "Unknown provider continuation routes");
         Check(!(await coordinator.SearchAsync("custom.account", "query", 20, result.Value.NextPageHandle, default)).IsSuccess, "Pagination cannot cross providers");
         var lease = await coordinator.AcquireStreamAsync(result.Value.Items.Single().Handle, default);
+        var mediaHandle = result.Value.Items.Single().Handle;
+        var mediaContext = await coordinator.CaptureMediaContextAsync(mediaHandle, default);
+        Check(mediaContext.IsCurrent(), "Active plugin context is current");
+        backend.InvalidateMediaContext("custom.account");
+        Check(mediaContext.IsCurrent(), "Another provider cannot invalidate this cache identity");
+        backend.InvalidateMediaContext("custom.public");
+        Check(!mediaContext.IsCurrent(), "Account change revokes a previously prepared lease");
+        var changedContext = await coordinator.CaptureMediaContextAsync(mediaHandle, default);
+        Check(changedContext.IsCurrent() && changedContext.CacheKey != mediaContext.CacheKey, "New authorization has a new cache identity");
+        await backend.SaveSettingAsync("custom.public", "payload", "normal", default);
+        Check(!changedContext.IsCurrent(), "Manifest setting change revokes the cache context");
+        var artistTrack = await coordinator.SearchAsync("custom.account", "query", 20, null, default);
+        var artist = await coordinator.GetCreatorAsync(artistTrack.Value.Items.Single().Handle, default);
+        Check(artist.IsSuccess, "Profile-only capability routes without CreatorFeed");
+        Check(!(await coordinator.GetCreatorPostsAsync(artist.Value.Handle, null, default)).IsSuccess, "Profile-only cannot invoke undeclared feed");
         Check(lease.IsSuccess && lease.Value.Quality.Id == "fixture", "Arbitrary provider track routes to stream capability");
         var originalTrack = coordinator.GetBackendTrack(result.Value.Items.Single().Handle)!;
         var savedStore = new SavedPlaylistStore(Path.Combine(root,"saved-playlists.json"));
@@ -183,12 +201,12 @@ public sealed class RoutingPlugin : IAuralisPlatformPlugin
         ValueTask.FromResult(PlatformResult<IReadOnlyList<IPlatformProvider>>.Success([new RoutingProvider("custom.public",context),new RoutingProvider("custom.account",context),new RoutingProvider("custom.configured",context),new RoutingProvider("custom.authonly",context)]));
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
-public sealed class RoutingProvider(string id, PlatformHostContext context) : IPlatformProvider, ITrackSearchCapability, IPlaylistBrowseCapability, IPlaylistDetailsCapability, IAuthenticationCapability, IStreamResolutionCapability, IPlatformMediaExtrasCapability, ITrackDetailsCapability
+public sealed partial class RoutingProvider(string id, PlatformHostContext context) : IPlatformProvider, ITrackSearchCapability, IPlaylistBrowseCapability, IPlaylistDetailsCapability, IAuthenticationCapability, IStreamResolutionCapability, IPlatformMediaExtrasCapability, ITrackDetailsCapability
 {
     public static PlatformCapabilityKind[] Capabilities(string id) => id == "custom.configured" ? [PlatformCapabilityKind.TrackSearch,PlatformCapabilityKind.TrackDetails]
         : id == "custom.authonly" ? [PlatformCapabilityKind.Authentication] : id == "custom.account"
-        ? [PlatformCapabilityKind.TrackSearch,PlatformCapabilityKind.PlaylistBrowse,PlatformCapabilityKind.PlaylistDetails,PlatformCapabilityKind.StreamResolution,PlatformCapabilityKind.Authentication]
-        : [PlatformCapabilityKind.TrackSearch,PlatformCapabilityKind.PlaylistBrowse,PlatformCapabilityKind.PlaylistDetails,PlatformCapabilityKind.StreamResolution,PlatformCapabilityKind.MediaExtras];
+        ? [PlatformCapabilityKind.CreatorProfile,PlatformCapabilityKind.TrackSearch,PlatformCapabilityKind.PlaylistBrowse,PlatformCapabilityKind.PlaylistDetails,PlatformCapabilityKind.StreamResolution,PlatformCapabilityKind.Authentication]
+        : [PlatformCapabilityKind.GlobalPages,PlatformCapabilityKind.Pages,PlatformCapabilityKind.TrackSearch,PlatformCapabilityKind.PlaylistBrowse,PlatformCapabilityKind.PlaylistDetails,PlatformCapabilityKind.StreamResolution,PlatformCapabilityKind.MediaExtras,PlatformCapabilityKind.CreatorSearch, PlatformCapabilityKind.CreatorFeed,PlatformCapabilityKind.CommentReplies,PlatformCapabilityKind.Comments];
     public PlatformProviderDescriptor Descriptor {get;} = new(id,"Declared " + id,new Version(1,0,0),Capabilities(id));
     public ValueTask<PlatformResult<PlatformUnit>> InitializeAsync(CancellationToken token) => ValueTask.FromResult(PlatformResult<PlatformUnit>.Success(PlatformUnit.Value));
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -236,6 +254,5 @@ public sealed class RoutingProvider(string id, PlatformHostContext context) : IP
     public Task<PlatformResult<PlatformAuthenticationChallenge>> BeginAuthenticationAsync(PlatformAuthenticationRequest request,CancellationToken token) => throw new NotSupportedException();
     public Task<PlatformResult<PlatformAuthenticationState>> CompleteAuthenticationAsync(PlatformAuthenticationCompletion completion,CancellationToken token) => throw new NotSupportedException();
     public Task<PlatformResult<PlatformUnit>> SignOutAsync(CancellationToken token) => Task.FromResult(PlatformResult<PlatformUnit>.Success(PlatformUnit.Value));
-    public Task<PlatformResult<PlatformStreamLease>> AcquireStreamAsync(PlatformPlaybackRequest request,CancellationToken token) => Task.FromResult(PlatformResult<PlatformStreamLease>.Success(new(new Uri("https://media.example.test/audio"),DateTimeOffset.UtcNow.AddMinutes(1),"audio/mpeg",new("fixture","Fixture"))));
     public Task<PlatformResult<IReadOnlyList<PlatformAudioQuality>>> GetAvailableQualitiesAsync(PlatformEntityId entity,CancellationToken token) => Task.FromResult(PlatformResult<IReadOnlyList<PlatformAudioQuality>>.Success([new("fixture","Fixture")]));
 }

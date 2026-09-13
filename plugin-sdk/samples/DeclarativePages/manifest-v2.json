@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 5,
+  "id": "sample.pages",
+  "displayName": "Declarative page sample",
+  "version": "2.0.0",
+  "minimumHostApiVersion": 1,
+  "maximumHostApiVersion": 1,
+  "hostRequirements": {
+    "minimumHostSdkVersion": "2.10.0",
+    "requiredFeatures": [
+      "comment-artwork.v1",
+      "declarative-pages.v1",
+      "declarative-pages.v2",
+      "declarative-pages.v3",
+      "declarative-pages.v4",
+      "declarative-pages.v5",
+      "declarative-pages.v6",
+      "global-pages.v1",
+      "comment-replies.v1",
+      "settings.v1",
+      "settings.v2"
+    ]
+  },
+  "entryAssembly": "Auralis.Sample.Pages.dll",
+  "entryType": "Auralis.Sample.Pages.Plugin",
+  "providers": [
+    {
+      "id": "sample.pages",
+      "displayName": "Page sample",
+      "capabilities": [
+        "GlobalPages",
+        "StreamResolution",
+        "Pages",
+        "TrackSearch",
+        "Comments",
+        "CommentReplies"
+      ],
+      "commentArtworkDomains": [],
+      "pages": [
+        {
+          "id": "profile",
+          "label": "演示资料",
+          "labelEn": "Sample profile",
+          "placement": "creator",
+          "documentVersion": 6
+        },
+        {
+          "id": "discography",
+          "label": "作品目录",
+          "labelEn": "Discography",
+          "placement": "media",
+          "documentVersion": 6,
+          "presentation": "page"
+        },
+        {
+          "id": "hub",
+          "label": "演示空间",
+          "labelEn": "Sample space",
+          "placement": "global",
+          "presentation": "page",
+          "documentVersion": 5
+        }
+      ],
+      "settings": [
+        {
+          "key": "ordering",
+          "kind": "choice",
+          "label": "排序",
+          "labelEn": "Ordering",
+          "group": {
+            "id": "catalog",
+            "label": "目录展示",
+            "labelEn": "Catalogue",
+            "description": "这些偏好由演示插件声明。",
+            "descriptionEn": "Preferences declared by this sample plugin."
+          },
+          "defaultValue": "default",
+          "choices": [
+            {
+              "value": "default",
+              "label": "默认",
+              "labelEn": "Default"
+            },
+            {
+              "value": "custom",
+              "label": "自定义",
+              "labelEn": "Custom"
+            }
+          ]
+        },
+        {
+          "key": "direction",
+          "kind": "choice",
+          "label": "方向",
+          "labelEn": "Direction",
+          "group": {
+            "id": "catalog",
+            "label": "目录展示",
+            "labelEn": "Catalogue",
+            "description": "这些偏好由演示插件声明。",
+            "descriptionEn": "Preferences declared by this sample plugin."
+          },
+          "defaultValue": "ascending",
+          "choices": [
+            {
+              "value": "ascending",
+              "label": "升序",
+              "labelEn": "Ascending"
+            },
+            {
+              "value": "descending",
+              "label": "降序",
+              "labelEn": "Descending"
+            }
+          ],
+          "when": {
+            "key": "ordering",
+            "value": "custom",
+            "hint": "选用自定义排序后可修改方向。",
+            "hintEn": "Choose Custom ordering to change direction."
+          }
+        }
+      ]
+    }
+  ]
+}

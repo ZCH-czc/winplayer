@@ -1188,7 +1188,22 @@ body.queue-over-player .scrim {
 .plugin-inventory-list { list-style: none; padding: 0; margin: 0; }
 .plugin-inventory-row { gap: 20px; }
 .plugin-row-actions { display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
+.plugin-inventory-row .plugin-row-actions { flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
+.plugin-settings-card [data-plugin-recovery], .plugin-import-review .plugin-import-actions > button { min-height: 40px; }
+.plugin-import-review summary { min-height: 40px; box-sizing: border-box; }
+.plugin-update-review { margin: 12px 0; padding: 16px; border: 1px solid var(--stroke); border-radius: var(--radius); background: var(--surface); min-width: 0; }
+.plugin-update-review h4 { font-size: 14px; margin: 0 0 12px; }
+.plugin-update-review dl { display: flex; flex-wrap: wrap; gap: 12px 32px; margin: 0; }
+.plugin-update-review dt { color: var(--text-secondary); font-size: 12px; }
+.plugin-update-review dd { margin: 4px 0 0; }
+.plugin-update-review .plugin-review-warning { color: var(--text); border-inline-start: 3px solid var(--accent); padding-inline-start: 10px; }
+.plugin-review-change { padding-block: 10px; border-bottom: 1px solid var(--stroke); }
+.plugin-review-change h5 { font-size: 13px; margin: 0 0 8px; }
+.plugin-review-change ul { margin-block: 6px 10px; padding-inline-start: 20px; }
+.plugin-review-differences > summary { min-height: 40px; box-sizing: border-box; }
 .plugin-import-review { padding: 0 20px 20px; overflow-wrap: anywhere; font-size: 13px; }
+/* Management contains live approval/focus state and nested scrolling; never defer this small set of cards. */
+.settings-page .settings-card.plugin-settings-card { content-visibility: visible; contain-intrinsic-size: none; }
 .plugin-import-review h3 { font-size: 16px; margin: 0 0 16px; }
 .plugin-import-review p { color: var(--text-secondary); }
 .plugin-package-hash { display: block; user-select: text; padding: 12px; margin-top: 8px; border: 1px solid var(--stroke); border-radius: 6px; font-size: 12px; }
@@ -3914,6 +3929,24 @@ body.is-playing .now-playing-overlay.open[data-player-style="record"] .vinyl-dis
 
 .platform-gateway-row {
   align-items: flex-start;
+}
+
+/* Manifest settings retain Fluent surfaces; plugin content supplies text, never CSS. */
+.plugin-setting-group { border-top: 1px solid var(--stroke); }
+.plugin-setting-group > header { padding: 20px 18px 10px; }
+.plugin-setting-group h3 { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.plugin-setting-group header p { margin: 6px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.plugin-setting-group .setting-row:first-of-type { border-top: none; }
+[data-declared-setting] .setting-label { min-width: 0; overflow-wrap: anywhere; }
+.plugin-setting-control { width: min(520px, 52%); min-width: 0; display: flex; justify-content: flex-end; }
+.plugin-setting-control .plugin-endpoint-control { width: 100%; }
+.plugin-setting-control .setting-text-input, .plugin-setting-control button { min-height: 40px; }
+.plugin-setting-control button:disabled, .plugin-setting-control input:disabled { opacity: .55; cursor: default; }
+[data-declared-setting] .plugin-setting-hint { color: var(--text-secondary); padding-top: 4px; line-height: 1.6; }
+@media (max-width: 900px) {
+  [data-declared-setting] { flex-wrap: wrap; gap: 12px; }
+  .plugin-setting-control { width: 100%; }
+  .plugin-setting-control > button { width: 100%; }
 }
 
 .plugin-endpoint-control {

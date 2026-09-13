@@ -21,6 +21,11 @@ internal sealed class OnlinePlaybackSourceService : IAsyncDisposable
     internal async Task<IMediaTransportResource> PrepareAsync(PlatformStreamLease lease, string? trackCacheKey, CancellationToken cancellationToken, bool bufferRemote = false)
     {
         ArgumentNullException.ThrowIfNull(lease);
+        // A stable entity key must not collapse different signed resources (for example a
+        // limited preview and a complete track). Never put the raw authorization in an index.
+        if (!string.IsNullOrWhiteSpace(trackCacheKey))
+            trackCacheKey += ":" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(lease.Url.AbsoluteUri)));
         try
         {
             return await _transport.PrepareAsync(new(lease.Url, lease.ExpiresAt, lease.MimeType, lease.Quality.Id,

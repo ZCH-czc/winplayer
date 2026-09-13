@@ -26,6 +26,14 @@ internal sealed partial class OnlinePlatformCoordinator
         _backend = backend ?? throw new ArgumentNullException(nameof(backend));
     }
 
+    internal async Task<(string CacheKey, Func<bool> IsCurrent)> CaptureMediaContextAsync(string handle, CancellationToken token)
+    {
+        var track = GetBackendTrack(handle);
+        if (track is null) return ("", static () => false);
+        var context = await _backend.CaptureMediaContextAsync(track.Id.ProviderId, token).ConfigureAwait(false);
+        return ($"{track.Id.ProviderId}:{track.Id.Value}:context-{context.Revision}", () => context.IsCurrent() && GetBackendTrack(handle) is not null);
+    }
+
     internal async Task<PlatformResult<OnlineTrackPageView>> SearchAsync(
         string providerId,
         string query,
@@ -126,13 +134,16 @@ internal sealed partial class OnlinePlatformCoordinator
                 "这首在线歌曲当前不可播放。");
         }
 
-        return await _backend.Router.AcquireStreamAsync(
+        var result = await _backend.Router.AcquireStreamAsync(
             entry.Track.Id.ProviderId,
             new PlatformPlaybackRequest(
                 entry.Track.Id,
                 allowQualityFallback: true,
                 allowPreview: entry.Track.Availability == PlatformTrackAvailability.PreviewOnly),
             cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return entry.IsCurrent?.Invoke() == false
+            ? PlatformResult<PlatformStreamLease>.Failure(PlatformErrorCode.NotFound, "页面作品已过期，请重新打开。") : result;
     }
 
     internal async Task<PlatformResult<PlatformVideoLease>> AcquireVideoAsync(
@@ -160,10 +171,13 @@ internal sealed partial class OnlinePlatformCoordinator
                 "这首歌没有可播放的 MV。");
         }
 
-        return await _backend.Router.AcquireVideoAsync(
+        var result = await _backend.Router.AcquireVideoAsync(
             entry.Track.Id.ProviderId,
             new PlatformVideoPlaybackRequest(entry.Track.MusicVideo.Id),
             cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        return entry.IsCurrent?.Invoke() == false
+            ? PlatformResult<PlatformVideoLease>.Failure(PlatformErrorCode.NotFound, "页面作品已过期，请重新打开。") : result;
     }
 
     internal async Task<PlatformResult<PlatformLyrics>> GetLyricsAsync(
@@ -333,6 +347,8 @@ internal sealed partial class OnlinePlatformCoordinator
             if (_tracks.TryGetValue(handle, out var trackEntry) &&
                 GetSafeArtworkUri(trackEntry.Track.ArtworkUrl) is { } trackArtwork)
             {
+                destinationAllowed = trackEntry.ArtworkAllowed;
+                if (destinationAllowed?.Invoke(trackArtwork) == false) { uri = null; return false; }
                 uri = trackArtwork;
                 return true;
             }
@@ -352,7 +368,8 @@ internal sealed partial class OnlinePlatformCoordinator
 
     private OnlineTrackView RegisterTrack(PlatformTrack track) => RegisterTrack(track, null);
 
-    private OnlineTrackView RegisterTrack(PlatformTrack track, string? savedHandle)
+    private OnlineTrackView RegisterTrack(PlatformTrack track, string? savedHandle, Func<bool>? isCurrent = null,
+        Func<Uri, bool>? artworkAllowed = null)
     {
         var handle = savedHandle ?? CreateHandle("track");
         var view = new OnlineTrackView(
@@ -376,7 +393,7 @@ internal sealed partial class OnlinePlatformCoordinator
         {
             PurgeExpiredHandles();
             TrimOldest(_tracks, MaximumTrackHandles - 1);
-            _tracks[handle] = new TrackHandleEntry(track, view, DateTimeOffset.UtcNow);
+            _tracks[handle] = new TrackHandleEntry(track, view, DateTimeOffset.UtcNow, isCurrent, artworkAllowed);
         }
 
         return view;
@@ -407,7 +424,7 @@ internal sealed partial class OnlinePlatformCoordinator
     private void PurgeExpiredHandles()
     {
         var cutoff = DateTimeOffset.UtcNow - HandleLifetime;
-        foreach (var key in _tracks.Where(pair => pair.Value.CreatedAt < cutoff)
+        foreach (var key in _tracks.Where(pair => pair.Value.CreatedAt < cutoff || pair.Value.IsCurrent?.Invoke() == false)
                      .Select(static pair => pair.Key).ToArray())
         {
             _tracks.Remove(key);
@@ -466,7 +483,9 @@ internal sealed partial class OnlinePlatformCoordinator
     private sealed record TrackHandleEntry(
         PlatformTrack Track,
         OnlineTrackView View,
-        DateTimeOffset CreatedAt) : IHandleEntry;
+        DateTimeOffset CreatedAt,
+        Func<bool>? IsCurrent = null,
+        Func<Uri, bool>? ArtworkAllowed = null) : IHandleEntry;
 
     private sealed record PlaylistHandleEntry(
         PlatformPlaylist Playlist,
