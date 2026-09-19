@@ -145,6 +145,10 @@ This repository contains source code. A source upload is not an installable rele
 
 ## Build and verify
 
+Open **[Auralis.Development.sln](Auralis.Development.sln)** for the grouped, complete public IDE workspace;
+**[Auralis.sln](Auralis.sln)** remains the production/CI entry point.
+See the [IDE setup guide](docs/IDE_SETUP.md) for Visual Studio / Rider prerequisites and startup instructions.
+
 Requirements: **Windows 10/11**, **.NET 8 SDK**, and **WebView2 Runtime**.
 
 ```powershell

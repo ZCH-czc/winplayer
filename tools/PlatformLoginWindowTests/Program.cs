@@ -48,6 +48,9 @@ public sealed class App : Application
 
 public sealed class FixtureBackend
 {
+    // Boundary observations only: this fixture does not create real media contexts.
+    public List<string> InvalidatedProviders { get; } = [];
+    public void InvalidateMediaContext(string providerId) => InvalidatedProviders.Add(providerId);
     public FixtureServices Services { get; } = new();
     public PlatformPluginHost Host { get; }
     public PlatformRouter Router => Host.Router;
@@ -79,6 +82,15 @@ public partial class MainWindow : Window
     private bool _nativeDarkTheme => false;
     private readonly List<string> _messages = [];
     private int _refreshes;
+    private int _prefetchVersion;
+    private int _prefetchDrains;
+    // No prefetch worker is started by this login-only diagnostic.
+    private Task DrainPrefetchAsync(string? nextHandle)
+    {
+        if (nextHandle is not null) throw new InvalidOperationException("Unexpected fixture prefetch target");
+        _prefetchDrains++;
+        return Task.CompletedTask;
+    }
     private Task ExecuteScriptAsync(string script)
     {
         var start = script.IndexOf('(') + 1;
@@ -105,6 +117,19 @@ public partial class MainWindow : Window
             catch (Exception e) { failed++; lines.Add("FAIL " + name + ": " + e.Message); }
             finally { fixture.Options.Clear(); ClosePlatformLogins(); await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background); }
         }
+        await Scenario("登录与断开使媒体上下文及预取失效", async () =>
+        {
+            var backend = ((App)Application.Current).PlatformBackend;
+            backend.InvalidatedProviders.Clear();
+            var version = _prefetchVersion;
+            var drains = _prefetchDrains;
+            await OpenPlatformLoginAsync("fixture.window");
+            Check(backend.InvalidatedProviders.SequenceEqual(new[] { "fixture.window" }), "Login did not invalidate its media context");
+            Check(_prefetchVersion == version + 1 && _prefetchDrains == drains + 1, "Login did not drain prefetch");
+            await SignOutPlatformAsync("fixture.window");
+            Check(backend.InvalidatedProviders.SequenceEqual(new[] { "fixture.window", "fixture.window", "fixture.window" }), "Sign-out did not bracket account cleanup with invalidation");
+            Check(_prefetchVersion == version + 2 && _prefetchDrains == drains + 2, "Sign-out did not drain prefetch");
+        });
         await Scenario("窗口复用与后台 Closed 回调", async () =>
         {
             await OpenPlatformLoginAsync("fixture.window");

@@ -145,6 +145,10 @@ Auralis 将播放页面与实际播放机制分开：应用负责界面、曲库
 
 ## 构建与验证
 
+在 IDE 中打开 **[Auralis.Development.sln](Auralis.Development.sln)**，可按分组浏览完整公开开发工程。
+原有 **[Auralis.sln](Auralis.sln)** 继续作为正式构建与 CI 入口。
+Visual Studio / Rider 的环境准备和启动方式见 [IDE 使用指南](docs/IDE_SETUP.zh-CN.md)。
+
 环境：**Windows 10/11**、**.NET 8 SDK**、**WebView2 Runtime**。
 
 ```powershell

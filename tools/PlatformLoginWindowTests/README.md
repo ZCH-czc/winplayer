@@ -23,3 +23,8 @@ Covered: background Closed dispatch, Show/Close failures and retry, Activate fai
 Close/cancellation exceptions, optional NativeLogin capability, authenticated automatic close,
 stale callbacks after replacement/sign-out, and closing all optional sessions.
 These checks do not replace actual provider login, Windows scaling/theme or audio/video acceptance.
+
+The IDE workspace includes this diagnostic. Its synthetic shell records media-context invalidation and
+prefetch-drain calls required by the current production partial; an additional scenario checks login and
+sign-out issue those calls. No real prefetch worker or media context is created, so this checks boundary
+scheduling only, not streaming cancellation or buffer reclamation.
