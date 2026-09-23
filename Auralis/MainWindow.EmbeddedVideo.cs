@@ -19,6 +19,7 @@ public partial class MainWindow
     private bool _embeddedVideoOpened;
     private double _embeddedResumePosition;
     private long _embeddedVideoRequestId;
+    private readonly VideoQualitySelection _videoQualities = new();
 
     private void StopEmbeddedVideo(bool restoreAudio)
     {
@@ -38,6 +39,7 @@ public partial class MainWindow
     private async Task SetEmbeddedVideoAsync(JsonElement root)
     {
         var handle = JsonText(root, "handle");
+        var qualityHandle = JsonText(root, "qualityHandle");
         if (!root.TryGetProperty("requestId", out var request) || !request.TryGetInt64(out var requestId) ||
             !root.TryGetProperty("enabled", out var enabled) || enabled.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return;
         if (!enabled.GetBoolean())
@@ -45,6 +47,7 @@ public partial class MainWindow
             if (handle != _currentTrackId) return;
             _embeddedVideoRequestId = requestId;
             StopEmbeddedVideo(true);
+            _videoQualities.Clear();
             await SendEmbeddedVideoStateAsync(handle, requestId, false, null);
             return;
         }
@@ -54,6 +57,12 @@ public partial class MainWindow
             await SendEmbeddedVideoStateAsync(handle, requestId, false, "歌曲入口已失效，请重新选择歌曲。");
             return;
         }
+        if (!_videoQualities.TryResolve(handle, qualityHandle, out var qualityId))
+        {
+            await SendEmbeddedVideoStateAsync(handle, requestId, _embeddedVideoActive, "画质选项已失效，请重新打开视频。");
+            return;
+        }
+        if (qualityHandle is null) _videoQualities.Clear();
         StopEmbeddedVideo(true);
         _embeddedVideoRequestId = requestId;
         var cancellation = ReplaceCancellation(ref _embeddedVideoCancellation);
@@ -64,7 +73,7 @@ public partial class MainWindow
         var resourcesActivated = false;
         try
         {
-            var result = await OnlinePlatforms.AcquireVideoAsync(handle!, token);
+            var result = await OnlinePlatforms.AcquireVideoAsync(handle!, token, qualityId);
             token.ThrowIfCancellationRequested();
             if (!result.IsSuccess)
             {
@@ -79,6 +88,7 @@ public partial class MainWindow
             var audio = await audioTask;
             token.ThrowIfCancellationRequested();
             if (handle != _currentTrackId || !ReferenceEquals(_embeddedVideoCancellation, cancellation)) return;
+            _videoQualities.Update(handle!, video);
             var position = _mediaPlayer.Position.TotalSeconds;
             var playing = _mediaPlayer.WantsPlayback;
             _embeddedVideoActive = true;
@@ -169,5 +179,5 @@ public partial class MainWindow
     }
 
     private Task SendEmbeddedVideoStateAsync(string? handle, long requestId, bool enabled, string? message) =>
-        ExecuteScriptAsync($"window.Auralis?.setEmbeddedVideoState({JsonSerializer.Serialize(new { handle, requestId, enabled, error = message is null ? null : new { message } }, WebJsonOptions)})");
+        ExecuteScriptAsync($"window.Auralis?.setEmbeddedVideoState({JsonSerializer.Serialize(new { handle, requestId, enabled, qualities = _videoQualities.Options, selectedQualityHandle = _videoQualities.Selected, error = message is null ? null : new { message } }, WebJsonOptions)})");
 }

@@ -12,9 +12,10 @@ internal static class PluginPageTests
         await PluginPageQueryTests.RunAsync(coordinator,backend,track);
         await PluginPageTargetTests.RunAsync(coordinator,backend,track);
         await PluginPageMediaTests.RunAsync(coordinator,backend);
+        PluginPageReadingTests.Run();
         Check(!PlatformPageEntry.IsValidList([new(){Id="../file",Label="Bad",LabelEn="Bad"}]),"Manifest route is not a path");
         Check(!PlatformPageEntry.IsValidList([new(){Id="a",Label="A",LabelEn="A",Placement="script"}]),"No executable placements");
-        Check(!PlatformPageValidation.IsValid(new(){Title="Bad",Version=7}),"Future renderer schema fails closed");
+        Check(!PlatformPageValidation.IsValid(new(){Title="Bad",Version=10}),"Future renderer schema fails closed");
         Check(!PlatformPageValidation.IsValid(new(){Title="Bad",Layout="html"}),"No arbitrary layout");
         Check(!PlatformPageValidation.IsValid(new(){Title="Bad",Cards=null!}),"Null cards rejected");
         Check(!PlatformPageValidation.IsValid(new(){Title="Bad",Cards=[new(){Image=new Uri("file:///secret")}]}),"File image rejected");

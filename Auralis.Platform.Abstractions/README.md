@@ -1,5 +1,21 @@
 # Auralis.Platform.Abstractions
 
+Development 1.16.0 adds optional public play/reaction/repost counts to read-only track and page metadata (`public-metrics.v1`).
+Development 1.15.0 adds optional video quality metadata/selection (`video-lease.v3`) and
+viewport batch hints (`page-batch.v1`), requiring Host SDK 2.14. Providers list only playable
+representations, keep representation IDs backend-only and preserve page size in continuation state.
+Existing constructors, API 1 and assembly identity remain unchanged; old plugins use automatic video.
+
+
+Development 1.14.0 adds Pages v9 optional Navigation and Updates, requiring Host SDK 2.13.
+These are bounded, provider-neutral, read-only data: no scripts, background subscriptions or account writes.
+Existing constructors, API 1 and assembly identity remain unchanged; earlier documents remain compatible.
+
+Development 1.13.0 adds Pages v8 bounded text runs, explicit author navigation and a nonrecursive quotation.
+Requires Host SDK 2.12; existing constructors and API 1 / assembly identity remain unchanged.
+Development 1.12.0 introduced Pages v7 feed/detail and explicit primary Open navigation.
+See [page contract](../docs/PLUGIN_PAGES.md) for fallback, ownership and shared budgets.
+
 Development 1.11.0 adds optional PlatformPageCard.Media and PlatformCreatorPost.Media using existing PlatformTrack metadata.
 Pages v6 / Host SDK 2.10 explicitly separates inert page reading from host-owned Play / Add to queue.
 No raw lease, command or UI code is added. API 1 / assembly 1.1.0.0 remain stable; earlier constructors stay compatible.

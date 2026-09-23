@@ -47,6 +47,24 @@ internal static class CommentArtworkPolicyTests
             Check(handler.Requests == (success ? 2 : 1), "Denied destination never reaches handler");
         }
         var active = true;
+        // A normal multi-megabyte reading image must not inherit the smaller avatar limit.
+        var largeHandler = new ImageHandler(_ => {
+            var response = new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new ByteArrayContent(new byte[3 * 1024 * 1024]) };
+            response.Content.Headers.ContentType = new("image/png");
+            return response;
+        });
+        using (var source = new Auralis.Artwork.HttpArtworkSource(largeHandler))
+        {
+            var full = await source.FetchAsync(new(new Uri("https://cdn.example.test/photo"), 16 * 1024 * 1024, policy.Allows));
+            Check(full.Length == 3 * 1024 * 1024, "Full reading image accepts existing 16 MiB artwork budget");
+            try
+            {
+                await source.FetchAsync(new(new Uri("https://cdn.example.test/photo"), 2 * 1024 * 1024, policy.Allows));
+                throw new InvalidOperationException("Avatar accepted an oversized payload");
+            }
+            catch (Auralis.Artwork.ArtworkException e)
+            { Check(e.Failure == Auralis.Artwork.ArtworkFailure.TooLarge, "Avatar budget stays small"); }
+        }
         var lateHandler = new ImageHandler(_ => { active = false; return Image(); });
         using (var source = new Auralis.Artwork.HttpArtworkSource(lateHandler))
         {

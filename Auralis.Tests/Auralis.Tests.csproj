@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="..\Auralis\Services\LyricsParser.cs" Link="LyricsParser.cs" />
+    <Compile Include="../Auralis/Services/VideoQualitySelection.cs" Link="VideoQualitySelection.cs" />
     <Compile Include="../Auralis/Services/MediaContextRevision.cs" Link="MediaContextRevision.cs" />
     <Compile Include="../Auralis/Services/SpeculativeWork.cs" Link="SpeculativeWork.cs" />
     <Compile Include="..\Auralis\Services\SingleInstanceCoordinator.cs" Link="SingleInstanceCoordinator.cs" />

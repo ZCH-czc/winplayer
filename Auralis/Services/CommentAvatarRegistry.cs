@@ -7,7 +7,7 @@ namespace Auralis.Services;
 internal sealed class CommentAvatarRegistry
 {
     private sealed record Entry(Uri Uri, DateTimeOffset Created, string ProviderId,
-        PlatformCommentArtworkPolicy Policy, Func<bool> IsActive)
+        PlatformCommentArtworkPolicy Policy, Func<bool> IsActive, bool FullImage)
     {
         internal bool Allows(Uri uri)
         {
@@ -21,18 +21,20 @@ internal sealed class CommentAvatarRegistry
     internal CommentAvatarRegistry(Func<DateTimeOffset>? now = null, int capacity = 2000)
     { _now = now ?? (() => DateTimeOffset.UtcNow); _capacity = Math.Clamp(capacity, 1, 2000); }
 
-    internal string? Register(string providerId, Uri? uri, PlatformCommentArtworkPolicy policy, Func<bool> isActive)
+    internal string? Register(string providerId, Uri? uri, PlatformCommentArtworkPolicy policy, Func<bool> isActive, bool fullImage = false)
     {
         if (uri is null) return null;
-        var entry = new Entry(uri, _now(), providerId, policy, isActive);
+        var entry = new Entry(uri, _now(), providerId, policy, isActive, fullImage);
         if (!entry.Allows(uri)) return null;
         Purge();
         var existing = _entries.FirstOrDefault(pair => pair.Value.Uri == uri &&
             pair.Value.ProviderId.Equals(providerId, StringComparison.OrdinalIgnoreCase) &&
-            ReferenceEquals(pair.Value.Policy, policy) && pair.Value.Allows(uri));
+            pair.Value.FullImage == fullImage && ReferenceEquals(pair.Value.Policy, policy) && pair.Value.Allows(uri));
         if (existing.Key is not null) return Proxy(existing.Key);
         if (_entries.Count >= _capacity) _entries.Remove(_entries.MinBy(pair => pair.Value.Created).Key);
-        var handle = "avatar-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant();
+        // Reading images keep the existing full-artwork budget; avatars/emotes retain 2 MiB.
+        // Only Native assigns the purpose. The Web cannot widen a grant by changing its prefix.
+        var handle = (fullImage ? "image-" : "avatar-") + Convert.ToHexString(RandomNumberGenerator.GetBytes(12)).ToLowerInvariant();
         _entries[handle] = entry;
         return Proxy(handle);
     }

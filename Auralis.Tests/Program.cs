@@ -34,6 +34,7 @@ if (args.Length > 0 && string.Equals(args[0], "--lan-preview", StringComparison.
 }
 
 CommentAvatarTests.Run();
+VideoQualitySelectionTests.Run();
 await SpeculativeWorkTests.RunAsync();
 AudioInformationTests.Run();
 if (SingleInstanceTests.RunChild(args)) return;

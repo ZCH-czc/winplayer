@@ -25,6 +25,11 @@ try
 {
     Check(typeof(IMediaTransportSession).Assembly.GetReferencedAssemblies().All(a=>!a.Name!.StartsWith("Auralis.Platform") && a.Name != "Auralis"), "contract independent of app/platform");
     Check(typeof(HttpMediaTransportSession).Assembly.GetReferencedAssemblies().All(a=>!a.Name!.StartsWith("Auralis.Platform") && a.Name != "Auralis"), "implementation independent of app/platform");
+    if (args.SequenceEqual(new[]{"--cleanup-only"}))
+    {
+        await CacheCleanupTests.RunAsync(root);
+        return 0;
+    }
     if (args.SequenceEqual(new[]{"--shared-only"}))
     {
         await SharedTransferTests.RunAsync(root);
@@ -188,6 +193,7 @@ try
     try {await pendingBoth[1].WaitAsync(TimeSpan.FromSeconds(5));}catch(OperationCanceledException){}
     await parallelClose.WaitAsync(TimeSpan.FromSeconds(5));
     Check(bodies.All(b=>b.Closed) && !Directory.EnumerateFiles(parallelFolder).Any(),"concurrent pending files are released");
+    checks += await CacheCleanupTests.RunAsync(root);
     checks += await BudgetTests.RunAsync(root);
     checks += await SharedTransferTests.RunAsync(root);
     checks += await RegistryTests.RunAsync(root);

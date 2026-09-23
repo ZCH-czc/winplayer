@@ -53,4 +53,9 @@ public sealed record PlatformCreatorPost
     public PlatformTrack? Media { get; init; }
     /// <summary>Visible comment count, or null when unknown.</summary>
     public long? CommentCount { get; init; }
+
+    /// <summary>Public reaction and repost counts when the platform reports them.</summary>
+    public long? LikeCount { get; init; }
+    /// <summary>Visible public repost count, or null when unknown.</summary>
+    public long? RepostCount { get; init; }
 }

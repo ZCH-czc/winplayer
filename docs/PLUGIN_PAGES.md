@@ -1,4 +1,124 @@
-# Declarative plugin pages — through stage 9
+# Declarative plugin pages
+
+## Identity navigation and visible-page updates v9 — development (2026-09-21)
+
+Host SDK **2.13.0**, Abstractions **1.14.0** add two provider-neutral primitives. A v9 main-page
+entry declares minimum SDK 2.13 and all `declarative-pages.v1` through `declarative-pages.v9` features.
+API 1, schema 5 and assembly identities remain unchanged. Documents v1–v8 remain supported.
+
+- `Navigation` is a horizontal identity/filter rail of at most 24 items. Each contains a read-only
+  `Action`, optional approved `Image`, and `Selected`; a nonempty rail has exactly one selection.
+  Routes/states must be distinct; typed entity targets are not permitted in these filter actions.
+  Images and actions consume the existing page-wide budgets. Native projects opaque handles and
+  approved artwork, never plugin state or external image URLs. Arrow/Home/End navigation, visible
+  focus, horizontal overflow, retained rail position and reduced motion are supported.
+- `Updates` is optional on a `feed` document, never on an append batch or detail. It declares
+  read-only `Check`/`Reload` actions, a nonempty backend-only revision (maximum 512 characters), and
+  an interval of 60–900 seconds. Native sends a per-coordinator HMAC fingerprint, not the revision.
+  A check response has no cards and does not replace visible content or create a history entry.
+- The renderer runs one timer only while the page is visible and online. Busy navigation, an open
+  dialog, the expanded player or edited query postpones checks. A changed fingerprint stops polling
+  and offers an explicit reload; unchanged results reschedule. Errors stop automatic checks and
+  offer manual retry. Leaving, hiding or revoking the page cancels an in-flight check; stale replies
+  cannot replace a newer view. This is **not** a background service, push subscription or a social
+  write capability, and discovery still performs no network requests.
+- The update notice uses a zero-height sticky container: it never shifts the reading position.
+  Filter/tab changes reuse staged transitions, cancellation, bounded history and the existing
+  append reveals. No page action changes the playback queue or resolves a media stream.
+
+Validation includes manifest-only compatibility, document bounds, actual native projection and
+`npm run test:ui -- updates motion`. Synthetic browser tests do not establish real-account, native
+playback or physical-monitor DPI acceptance. Adopting these new primitives needs a compatible host
+once; subsequent plugin changes within this vocabulary do not need provider-specific host code.
+
+## Shared discussion reader — development (2026-09-20)
+
+The detail region and existing right-side player/legacy-page drawer now use `page-discussion.js`.
+The host owns two container lifetimes, one request-id allocator and mutually exclusive discussion reads.
+Page lifetime checks the active route; drawer lifetime checks its open/closing state and, when following
+playback, the current media handle and expanded player. Both retain provider revision and capability checks.
+That milestone changed no bridge message, SDK feature, manifest, API or assembly version (SDK 2.12 / Pages v8).
+This UI refinement needs updated host Web resources, **not** a newly compiled platform plugin.
+
+- Replies replace the comment body, rather than expanding an independently scrolling nested card.
+  Escape from replies returns to roots with scroll, sorting and exact reply-button focus; another Escape
+  dismisses the drawer and returns to its trigger. The existing drawer enter/exit motion remains.
+- Dates, avatars, safe emote fallback, sorting, timeout/retry and bounded reading windows are shared.
+  Current comments reserve a full 100-row batch before appending (maximum 200); explicit continuation
+  retains up to three previous sections. More than 500 accessible comments remain reachable, not all mounted.
+- Closing cancels at dismissal start. A queued dialog-close event cannot cancel a successor page read.
+  Track/revision changes reject old results. Removing replies alone retains roots and removes reply controls.
+  Language changes update local controls without fetching again. Discussion operations do not issue playback
+  commands, clear the video canvas, or change the playback queue.
+
+Tests: `npm run test:ui -- discussion media community pagefeeds readingv7 readingv8` against source and
+clean publish resources. Fixtures are isolated and synthetic, **not** real-account/native playback acceptance.
+Next: verify the complete private-plugin reading path in an explicitly authorized native test session,
+including actual account data, video continuity and Windows DPI. Keep missing/limited source content explicit;
+do not add social writes or broaden the SDK before this read-only path is accepted.
+
+## Structured reading v8 — development (2026-09-20)
+
+Host SDK **2.12.0**, Abstractions **1.13.0** add bounded `Body`, `AuthorAction` and a single-level
+`Quote`. Adopt via documentVersion 8, main-page presentation, minimum SDK 2.12.0 and all Pages v1–v8
+features. API 1, schema 5 and assembly identities stay stable; v1–v7 documents remain compatible.
+
+- `Body` contains at most 128 `PlatformPageTextRun(Text, Image)` values. Concatenated text must exactly
+  equal the existing `Text` fallback (at most 32000 UTF-16 units). No HTML, links, scripts or arbitrary nodes.
+  Approved inline artwork uses the existing proxy; image failure and reduced motion retain text.
+- `Quote` is a separate, nonrecursive type: title, body/text, author/avatar/action, date, nine-image gallery
+  and an explicit optional discussion/count. It has **no** recursive quote or media playback reference.
+  Status `unavailable` is inert: no artwork/body runs, author action or discussion/count.
+- Quotation text/images and author actions consume the existing page budgets (128000 text units,
+  300 gallery/inline images, 128 navigation actions). Native validates the complete document before
+  registering handles; original discussion and author targets must belong to the same provider.
+- A feed's quote-comment button enters the parent detail and selects the quote's own discussion.
+  The discussion header names the selected subject. Main-post and original-post comments are never
+  inferred from each other. Direct detail author navigation and Back reuse existing focus/history handling.
+- Feed units stay ordered; original content is inset in its sharing post, not a second independent card.
+  Detail text remains fully expanded; gallery and existing media controls retain their established paths.
+
+Validation: `PluginPageReadingTests`, `HostCompatibilityTests`, actual coordinator projection tests and
+`npm run test:ui -- readingv7 readingv8`. The v8 browser fixture checks quotation attribution, text safety,
+fallbacks, focus, independent discussions and the existing bounded reply flow in six theme/scale cases.
+Real platform data adapters are private. No installed app or plugin is modified by these development tests.
+The shared reader milestone above completes drawer reuse. Separately verify native/real-account behavior.
+New system vocabulary still requires a compatible host; declared vocabulary can be reused by plugins.
+
+## Reading surfaces v7 — development prototype (2026-09-20)
+
+Host SDK **2.11.0**, Abstractions **1.12.0** add explicit `feed` / `detail` layouts and
+`PlatformPageCard.Open`, a primary read-only navigation action. This is a new host vocabulary,
+not a claim that an old installed host can render it through a plugin-only update.
+API 1, manifest schema 5 and assembly identities remain unchanged; Pages v1–v6 retain their layouts.
+Plugins adopting v7 must declare `presentation: "page"`, document version 7, minimum SDK 2.11.0,
+and `declarative-pages.v1` through `declarative-pages.v7` (plus features for their other capabilities).
+
+- `feed`: ordered reading units, two staggered columns at 980 CSS px of available content width and one below that.
+  Each next card follows the shorter column with a 16px gap; DOM/tab order remains the source order,
+  including after append, text expansion and resize. Every unit has an explicit primary detail link. Never infer
+  primary navigation from action order, provider names or labels. Catalogue `cards` remain a grid.
+- `detail`: exactly one card, no query or next-page action. Text is fully expanded. Its optional
+  existing `Discussion` reference opens a host-owned discussion region **inside** the main page.
+  Discussion stays below the original text in the same readable detail column at all widths.
+- A feed comment action follows `Open` and opens the returned detail's discussion. No new bridge
+  authority is granted: page, discussion, reply and continuation handles are still native-owned.
+- Root comments and reply details are separate views. Back restores root sorting, loaded items,
+  scroll and reply-button focus. Dates, avatars and approved comment emotes are retained.
+- Requests share the existing media-hub serial allocator. Cancel/disable/context revision rejects
+  late results; errors require explicit retry. No reading action resolves audio or starts playback.
+- Comments append in batches of at most 100, reserve room before the next batch (active maximum 200),
+  then require explicit continuation. Up to three previous sections are retained per view.
+  Appending retains comment nodes; navigation uses a short transition, disabled for reduced motion.
+
+Validation: `PluginPageReadingTests`, manifest compatibility tests and actual coordinator projection
+tests; `npm run test:ui -- readingv7` exercises synthetic feed/detail/comments/replies/back, pagination,
+retry, revision removal, keyboard focus and six light/dark browser scale 1/1.5/2 cases.
+Screenshots: local `artifacts/plugin-reading-v7-ui`. These are **not** Windows native DPI or real-account acceptance.
+
+Historical v7 scope: structured text and quotations were added subsequently in v8 above. Reuse in the
+full-screen player's existing comment drawer is covered by the later shared-reader milestone. No installed package, current test entry
+or Release was changed by this prototype; old plugin binaries retain their layouts until explicitly adapted.
 
 ## Stage 9: independent musician discovery, still without a core update
 
@@ -434,10 +554,17 @@ prevent an old request from replacing current content. Errors preserve content a
 - Eight actions/group and 128 actions/document including Next; backend state at most 8192.
 - Navigation registry: 512 references, 30-minute expiry; continuation chain at most 128 reads.
 - Community card/discussion/reply references share the bounded 8192-entry, two-hour registry and revision checks.
-- Web feed: at most 1000 distinct cards per open page, with an explicit display-limit notice (not “all loaded”).
+- Web feed: at most 200 distinct cards in a reading window. Once more than 100 are present,
+  automatic append stops; “Continue reading” starts another window, reserving room for a full
+  100-card response. A failed continuation preserves the current window and can be retried.
 - Three empty incremental pages stop automatic advance and leave a manual continuation.
-- Back history: at most 64 navigation entries; back re-reads the previous route, not an unbounded snapshot cache.
-  It does not restore all previously appended batches after navigating into an internal subpage.
+- Back history: at most 64 navigation entries. Up to six session-only reading snapshots (each
+  no older than 60 seconds, same language) retain appended cards, expansion, scroll and focus.
+  Native must successfully validate/re-read navigation before restoration; evicted/expired snapshots
+  fall back to that response. Closing, leaving or losing the provider clears snapshots.
+- Card layout retains DOM order, uses height-aware row spans rather than dense reordering,
+  and disconnects observation when hidden/closed. Host toolbar language updates do not reload
+  plugin content; plugin-provided labels are translated by the next explicit read/refresh.
 - These are cooperative resource limits, not protection against malicious in-process plugins.
 
 ## Verification

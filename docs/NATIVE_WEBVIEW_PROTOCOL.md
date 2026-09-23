@@ -1,5 +1,35 @@
 # Native ↔ WebView2 消息协议
 
+2026-09-23 页面返回缓存：`readPluginPage` / `readPluginGlobalPage` 可附带布尔值 `forceRefresh`；
+Native 只对已验证的只读页面在当前插件修订内保留最多 32 个、90 秒的短时投影，显式刷新与更新检查跳过缓存。
+页面卡片可选地带 `likeCount` / `repostCount`，曲目可选地带 `viewCount` 与作者名称列表；均为公开统计或展示字段，
+不授权播放、账号写操作或外部导航。字幕地址和登录态仍只在插件侧处理，Web 只接收既有 `setLyrics` 文本/时间轴。
+
+2026-09-22 详情分栏：Web 根据可用逻辑宽度并排呈现详情与评论。进入有效 detail 文档后，
+按已有 discussionHandle/Comments 能力读取一次主讨论（仅原文有讨论时使用原文），不抢正文焦点。
+明确点击评论仍聚焦讨论；改变窗口尺寸不发请求、不重建评论列表。回复、分页、取消、
+提供方修订与迟到响应沿用原校验，无新增 Native action、平台权限或 SDK 字段。
+
+2026-09-22（开发 Host SDK 2.14 / Abstractions 1.15，API 1 不变）：
+- `readPluginPage` / `readPluginGlobalPage` 可带 `preferredPageSize`，必须为 6–20 的整数。
+  Native 校验后作为只读批量提示传给插件；不改变句柄归属、查询权限或页面数据上限。
+  CSS 可用视口已包含 DPI/缩放，不再乘 devicePixelRatio。插件在新查询采用提示，续页保持原 cursor 的页大小。
+- `setEmbeddedVideo` 可带此前当前曲目获得的 `qualityHandle`（`vq-` 随机句柄）。省略表示自动。
+  Native 只接受当前会话签发的选项，映射到后端 `PlatformVideoPlaybackRequest.QualityId`，不接收 URL 或平台画质 ID。
+- `setEmbeddedVideoState` 新增 `qualities:[{handle,label}]`、`selectedQualityHandle`，最多 24 档。
+  数据来自插件当前授权租约的实际可播放轨道，旧插件为空。平台标识、签名 URL、请求头、音视频租约只留在后端。
+  仍由 handle/requestId 过滤迟到结果，失败恢复音频；换曲清除 UI，成功重新签发画质句柄使旧选项失效。
+- 画质切换沿用原解码器及音频状态/进度恢复，Web 保留最后一帧至新帧到达。暂停不会被主动改成播放。
+  新插件必须声明 `video-lease.v3` / `page-batch.v1` 与 minimumHostSdkVersion 2.14.0；旧插件继续使用原协议。
+
+
+2026-09-20：详情评论区与播放器／旧页面评论抽屉共用请求状态机，既有 comments/replies 消息不变。
+两容器共享递增 requestId，打开一处先取消另一处；取消只针对该组件仍持有的 pending kind。
+关闭动画开始即撤销等待，异步 dialog close 事件不得再取消已交给另一个容器的新请求。
+响应同时校验 kind、requestId、subject、provider revision 和容器生命周期；跟随播放的抽屉另验当前曲目。
+只有 CommentReplies 被撤销时返回根评论并清回复入口；Comments/修订失效关闭讨论，不停止播放。
+本次不新增 Native action、公开媒体信息或平台 SDK 特性；需要配套宿主 Web 资源更新，插件不需重编。
+
 2026-09-13 第十三阶段：`pickPluginRecovery {requestId,id}` 是通用平台管理 action，沿用同源、安全整数、
 管理互斥和 `setPluginManagementResult` 回调。Native 单文件选择器提供路径；Web 不能提交路径或选择历史目录。
 管理器要求同一插件 ID、低于当前选择的版本、兼容清单与当前选择完整性通过；失败固定 `recoveryUnavailable`。
@@ -801,3 +831,58 @@ The page projection adds optional `query: { submit: { label, handle }, fields: [
 Only public field definitions, defaults and choices reach WebView; submit route/state remain native.
 The renderer submits only on explicit Enter/button activation, preserves bounded in-memory query
 snapshots for back/retry, and rejects query forms on appended batches.
+
+## Pages v7 reading surfaces (development Host SDK 2.11)
+
+`setPluginPage.page` now projects the validated document `version` and optional card
+`open: { label, handle }`. Layouts `feed` and `detail` require version 7 and main-page presentation.
+`open` uses the same native-owned navigation registry as actions; route/state/typed entity IDs never
+reach WebView. Native validates target ownership and declared entry capability before issuing a handle.
+Detail requires one card, without query/next; append must not change the active layout.
+
+The optional existing `discussionHandle` supplies a detail's in-page comments. The renderer uses
+`requestPlatformExtras` / `setPlatformExtras` with `kind: comments|replies`, opaque subject/root/page
+handles, sort and a shared monotonically allocated requestId; no new account or playback action exists.
+Page identity/revision and request kind/id/subject must still match on response. Closing/navigating away
+or removing the provider cancels reads, clears observers and ignores late results.
+Root and reply views are separate; Back restores root scroll/focus. Existing legacy pages and the
+full-screen comment drawer are unchanged in this milestone. No public/signed media URLs are added.
+
+## Pages v8 structured reading (development Host SDK 2.12)
+
+Version 8 adds card `body: [{text,image}]`, `authorAction: {label,handle}` and optional `quote` with
+`status`, `title`, `text`, `body`, `author`, `avatar`, `authorAction`, `publishedAt`, `images`,
+`discussionHandle`, `commentCount`. No recursive quote or playable media is allowed inside a quote.
+Inline image/avatar/gallery values are approved host artwork proxy URLs, never provider origins.
+Raw entity IDs, routes and navigation state stay Native-only. The complete document is validated before
+projection, including quotation subject/target provider ownership and shared page budgets.
+The same readPluginPage/readPluginGlobalPage and comments/replies messages are used. Selecting quoted
+comments opens the parent detail and then that quote's own opaque discussion; no extra authority or writes.
+The v7 feed/detail presentation rules also apply to v8. Earlier document versions reject these new fields.
+
+## Pages v9 identity filters and visible-page updates (development Host SDK 2.13)
+
+Version 9 optionally projects `navigation: [{action: {label,handle}, image, selected}]` and
+`updates: {check: {label,handle}, reload: {label,handle}, fingerprint, intervalSeconds}`.
+Navigation is limited to 24 distinct filters with exactly one selection; images use approved artwork
+proxies. Update declarations are limited to feed documents, intervals 60–900 seconds, and read-only
+navigation actions without typed entity targets. Append batches cannot redefine either field.
+The opaque 64-character fingerprint is an HMAC of provider/revision using a per-coordinator random key;
+raw revision strings and plugin state never reach WebView. These use existing native-owned page handles
+and readPluginGlobalPage/readPluginPage messages; discovery still neither executes plugins nor networks.
+
+The renderer only checks the active visible online page. Check results must be v9 feed documents without
+cards or append semantics. They do not commit a page, alter history or move scroll. Changed fingerprints
+stop checks and expose explicit reload, while errors stop checks until manual retry. Foreground
+navigation, hiding/offline, leaving or revocation cancels old checks; ordinary request/revision guards
+reject late replies. Native validation is authoritative; a browser timer is not a plugin sandbox.
+
+### Artwork purpose correction (2026-09-21, no SDK/message change)
+
+Native now registers page card/gallery/quotation and legacy feed pictures as full artwork (`image-` opaque
+handles), using the existing 16 MiB artwork download budget. Avatar, navigation portrait and inline emote
+grants retain their `avatar-` handles and 2 MiB budget. The old projection incorrectly assigned gallery
+pictures the avatar budget, rejecting otherwise valid larger images. Identical source URIs are deduplicated
+only within the same purpose and provider/policy; changing a handle prefix cannot create a larger grant.
+Each redirect and completed download still checks the provider's approved domains and active revision.
+No URL, cookie, request header, new remote authority or account data is exposed to the main WebView.

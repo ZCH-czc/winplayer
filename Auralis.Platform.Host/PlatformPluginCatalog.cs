@@ -422,6 +422,12 @@ public sealed class PlatformPluginCatalog
                 (provider.Settings?.Any(s => s.UsesV2) == true && (document.SchemaVersion < 5 ||
                     document.HostRequirements is null || new Version(document.HostRequirements.MinimumHostSdkVersion) < new Version(2, 8, 0))) ||
                 !PlatformPageEntry.IsValidList(provider.Pages) ||
+                (provider.Pages?.Any(e => e.DocumentVersion >= 9) == true &&
+                    (document.HostRequirements is null || new Version(document.HostRequirements.MinimumHostSdkVersion) < new Version(2, 13, 0))) ||
+                (provider.Pages?.Any(e => e.DocumentVersion >= 8) == true &&
+                    (document.HostRequirements is null || new Version(document.HostRequirements.MinimumHostSdkVersion) < new Version(2, 12, 0))) ||
+                (provider.Pages?.Any(e => e.DocumentVersion >= 7) == true &&
+                    (document.HostRequirements is null || new Version(document.HostRequirements.MinimumHostSdkVersion) < new Version(2, 11, 0))) ||
                 (provider.Pages?.Any(e => e.DocumentVersion >= 6) == true &&
                     (document.HostRequirements is null || new Version(document.HostRequirements.MinimumHostSdkVersion) < new Version(2, 10, 0))) ||
                 (provider.Pages?.Any(e => e.DocumentVersion >= 5) == true &&
@@ -483,6 +489,12 @@ public sealed class PlatformPluginCatalog
                 needed.Add("declarative-pages.v5");
             if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 6)))
                 needed.Add("declarative-pages.v6");
+            if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 7)))
+                needed.Add("declarative-pages.v7");
+            if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 8)))
+                needed.Add("declarative-pages.v8");
+            if (providers.Any(p => p.Pages.Any(e => e.DocumentVersion >= 9)))
+                needed.Add("declarative-pages.v9");
             if (document.CredentialAliases?.Count > 0) needed.Add("credential-aliases.v1");
             foreach (var (kind, feature) in new[] {
                 (PlatformCapabilityKind.NativeLogin, "native-login.v1"), (PlatformCapabilityKind.TrackDetails, "track-details.v1"),

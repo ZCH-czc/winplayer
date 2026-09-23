@@ -30,10 +30,11 @@ const handle=c=>'page-'+c.repeat(32),community=n=>'community-'+n.toString(16).pa
       pages:[{id:'home',label:'动态',labelEn:'Activity',placement:'creator',presentation:'page',acceptsCreatorContext:true,documentVersion:2}]};
     const picture='https://platform-art.auralis.local/demo';
     const makeCard=n=>({handle:community(n+100),author:'Demo musician',avatar:picture,title:'Original post '+n,
-      text:'Paragraph one.\n\n'+('Readable demonstration content. '.repeat(n%2?12:5))+' <script>not executable</script>',publishedAt:'2026-09-13T03:00:00Z',
+      text:'Paragraph one.\n\n'+('Readable demonstration content. '.repeat(n%2?30:5))+' <script>not executable</script>',publishedAt:'2026-09-13T03:00:00Z',
       images:n===0?[picture,picture+'2',picture+'3']:[picture],actions:[],discussionHandle:community(n+200),commentCount:30});
     const first={title:'Demo musician',description:'An original read-only plugin page.\nActivity and pictures supplied by the plugin.',image:picture,
-      layout:'cards',cards:[],actions:[],append:false,collectionHandle:'collection-demo',next:{label:'Activity',handle:handle('a')}};
+      layout:'cards',cards:[],actions:[],append:false,collectionHandle:'collection-demo',next:{label:'Activity',handle:handle('a')},
+      tabs:[{action:{label:'Activity',handle:handle('d')},selected:true},{action:{label:'About',handle:handle('c')},selected:false}]};
     let failed=false,hold=false,last,attempts=0;
     await page.exposeFunction('feedBridge',async m=>{
       messages.push(m);
@@ -42,7 +43,9 @@ const handle=c=>'page-'+c.repeat(32),community=n=>'community-'+n.toString(16).pa
       if(m.action==='readPluginPage'){
         last=m;if(hold)return;
         if(m.navigationHandle===handle('b')&&!failed){failed=true;attempts++;return page.evaluate(x=>window.Auralis.setPluginPage(x),{...m,error:{message:'Temporary append error'}});}
-        const doc=!m.navigationHandle?first:{...first,append:true,cards:m.navigationHandle===handle('a')?Array.from({length:6},(_,i)=>makeCard(i)):[makeCard(0),makeCard(6)],
+        const doc=!m.navigationHandle||m.navigationHandle===handle('d')?first:m.navigationHandle===handle('c')?
+          {...first,layout:'list',next:null,cards:[{title:'Biography',text:'Original profile',actions:[]}],tabs:first.tabs.map(t=>({...t,selected:!t.selected}))}:
+          {...first,append:true,tabs:[],cards:m.navigationHandle===handle('a')?Array.from({length:6},(_,i)=>makeCard(i)):[makeCard(0),makeCard(6)],
           next:m.navigationHandle===handle('a')?{label:'More activity',handle:handle('b')}:null};
         return page.evaluate(x=>window.Auralis.setPluginPage(x),{...m,page:doc});
       }
@@ -65,23 +68,30 @@ const handle=c=>'page-'+c.repeat(32),community=n=>'community-'+n.toString(16).pa
     catch(e){console.log({errors,messages:messages.slice(-12),dom:await feed.evaluate(n=>n.outerHTML)});await page.screenshot({path:path.join(out,'failure.png')});throw e;}
     assert.equal(await page.locator('dialog[open]').count(),0,'plugin presentation is main page');
     assert(await feed.locator('.plugin-page-header').evaluate(n=>{
-      const back=n.querySelector('button').getBoundingClientRect(),title=n.querySelector('h1').getBoundingClientRect();
-      return title.left-back.right<=20&&title.left>=back.right;
-    }),'title stays beside Back, not at the far right');
+      const avatar=n.querySelector('.plugin-profile-avatar').getBoundingClientRect(),title=n.querySelector('h1').getBoundingClientRect();
+      return title.left-avatar.right<=25&&title.left>=avatar.right&&title.bottom>avatar.top&&title.top<avatar.bottom;
+    }),'identity heading stays beside its avatar; navigation has a separate control row');
     assert.equal(await feed.locator('script').count(),0);
-    await feed.evaluate(n=>Promise.allSettled(n.getAnimations().map(a=>a.finished)));
+    const expand=feed.locator('.plugin-text-toggle').first();
+    await expand.click();assert.equal(await expand.getAttribute('aria-expanded'),'true');
+    await expand.click();assert.equal(await expand.getAttribute('aria-expanded'),'false');
+    if(scale===1.5)assert.equal(await feed.evaluate(n=>n.getAnimations({subtree:true}).filter(a=>a.playState==='running').length),0,'reduced motion does not start feed animations');
+    await feed.evaluate(n=>Promise.allSettled(n.getAnimations({subtree:true}).map(a=>a.finished)));
     assert(await feed.evaluate(n=>n.scrollWidth<=n.clientWidth+1&&n.parentElement.scrollWidth<=n.parentElement.clientWidth+1),'no horizontal overflow');
     assert.equal(await feed.locator('.plugin-page-cards').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length),scale===2?1:2);
+    await feed.evaluate(n=>{n.parentElement.scrollTop=0;});
     await page.screenshot({path:path.join(out,theme+'-'+scale+'-feed.png')});
-    await feed.locator('.plugin-image-button').first().click();const gallery=page.locator('.plugin-gallery');
+    await feed.locator('.plugin-image-button').first().click();const gallery=page.locator('.plugin-gallery:not(.creator-gallery)');
+    const galleryOriginScroll=await feed.evaluate(n=>n.parentElement.scrollTop);
     await gallery.waitFor({state:'visible'});await page.keyboard.press('ArrowRight');assert.match(await gallery.locator('header').textContent(),/2 \/ 3/);
     await page.keyboard.press('Escape');await gallery.waitFor({state:'hidden'});assert(await feed.isVisible());
     assert(await feed.locator('.plugin-image-button').first().evaluate(n=>n===document.activeElement),'image focus restored');
+    assert(Math.abs(await feed.evaluate(n=>n.parentElement.scrollTop)-galleryOriginScroll)<2,'gallery close preserves underlying reading position');
     await feed.getByRole('button',{name:'View comments · 30',exact:true}).first().click();
     const comments=page.locator('dialog[aria-labelledby="mediaDialogTitle"]');try{await comments.locator('.comment-meta time').waitFor({timeout:10000});}catch(e){console.log({errors,messages:messages.slice(-6),comments:await comments.evaluate(n=>n.outerHTML)});throw e;}
-    await comments.locator('[data-media-action="replies"]').click();await comments.locator('.comment-reply').waitFor();
-    await comments.locator('[data-media-action="more-replies"]').click();await page.waitForFunction(()=>document.querySelectorAll('.comment-reply').length===2);
-    assert.equal(await comments.locator('.comment-reply time').count(),2);
+    await comments.locator('[data-reply]').click();await page.waitForFunction(()=>document.querySelectorAll('.discussion-list > article').length===2);
+    assert.equal(await comments.locator('.discussion-list time').count(),2);
+    await page.keyboard.press('Escape');assert(await comments.isVisible(),'reply Back preserves drawer');
     await page.keyboard.press('Escape');await comments.waitFor({state:'hidden'});
     await feed.evaluate(n=>{window.originalCard=n.querySelector('.plugin-page-card');n.parentElement.scrollTop=n.parentElement.scrollHeight;});
     await feed.getByText('Temporary append error',{exact:true}).waitFor();
@@ -90,6 +100,29 @@ const handle=c=>'page-'+c.repeat(32),community=n=>'community-'+n.toString(16).pa
     await feed.getByRole('button',{name:'Retry',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('.plugin-page-route .plugin-page-card').length===7);
     assert(await page.evaluate(()=>window.originalCard===document.querySelector('.plugin-page-card')),'append never replaces already read DOM');
+    await feed.locator('.plugin-text-toggle').first().click();
+    await feed.evaluate(n=>{n.parentElement.scrollTop=500;window.readingScroll=n.parentElement.scrollTop;});
+    await feed.getByRole('tab',{name:'About',exact:true}).click();await feed.getByText('Biography',{exact:true}).waitFor();
+    const beforeReturn=messages.filter(m=>m.action==='readPluginPage').length;
+    await feed.getByRole('tab',{name:'Activity',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('.plugin-page-route .plugin-page-card').length===7);
+    assert.equal(messages.filter(m=>m.action==='readPluginPage').length,beforeReturn+1,'validate navigation but do not fetch every old feed page again');
+    assert(await page.evaluate(()=>window.originalCard===document.querySelector('.plugin-page-card')),'tab return restores original cards');
+    assert.equal(await feed.locator('.plugin-text-toggle').first().getAttribute('aria-expanded'),'true','long post expansion survives tab round trip');
+    assert(await feed.evaluate(n=>Math.abs(n.parentElement.scrollTop-window.readingScroll)<2),'sticky tabs retain the actual reading position');
+    assert(await feed.getByRole('tab',{name:'Activity',exact:true}).evaluate(n=>n===document.activeElement));
+    await feed.getByRole('tab',{name:'About',exact:true}).click();await feed.getByText('Biography',{exact:true}).waitFor();
+    await page.evaluate(()=>{window.originalNow=Date.now;Date.now=()=>window.originalNow()+61000;});
+    await feed.getByRole('tab',{name:'Activity',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelectorAll('.plugin-page-route .plugin-page-card').length===6);
+    assert(await page.evaluate(()=>window.originalCard!==document.querySelector('.plugin-page-card')),'expired reading view reloads instead of resurrecting old cards');
+    await page.evaluate(()=>{Date.now=window.originalNow;});
+    hold=true;await feed.locator('[data-plugin-refresh]').click();
+    await page.waitForFunction(()=>document.querySelector('.plugin-page-status .loading-state'));
+    assert.equal(await feed.getByText('Loading…',{exact:true}).count(),1,'refresh has one shared loading status, not duplicate header/footer labels');
+    assert.equal(await feed.locator('.plugin-page-card').count(),6,'refresh keeps already read cards while loading');
+    hold=false;await page.evaluate(x=>window.Auralis.setPluginPage(x),{...last,page:first});
+    await page.waitForFunction(()=>document.querySelectorAll('.plugin-page-route .plugin-page-card').length===6);
     await page.keyboard.press('Escape');await feed.waitFor({state:'hidden'});
     await page.waitForFunction(()=>document.activeElement?.matches('[data-media-action="track-creator"]'));
     assert.equal(await page.locator('#searchInput').inputValue(),'Demo');

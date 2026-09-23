@@ -148,7 +148,7 @@ internal sealed partial class OnlinePlatformCoordinator
 
     internal async Task<PlatformResult<PlatformVideoLease>> AcquireVideoAsync(
         string handle,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? qualityId = null)
     {
         TrackHandleEntry? entry;
         lock (_gate)
@@ -173,7 +173,7 @@ internal sealed partial class OnlinePlatformCoordinator
 
         var result = await _backend.Router.AcquireVideoAsync(
             entry.Track.Id.ProviderId,
-            new PlatformVideoPlaybackRequest(entry.Track.MusicVideo.Id),
+            new PlatformVideoPlaybackRequest(entry.Track.MusicVideo.Id) { QualityId = qualityId },
             cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return entry.IsCurrent?.Invoke() == false
@@ -387,7 +387,9 @@ internal sealed partial class OnlinePlatformCoordinator
             track.Duration?.TotalSeconds ?? 0,
             track.Availability.ToString().ToLowerInvariant(),
             track.Availability != PlatformTrackAvailability.Unavailable,
-            track.MusicVideo is not null);
+            track.MusicVideo is not null,
+            track.ViewCount is >= 0 ? track.ViewCount : null)
+        { ArtistNames = track.Artists.Take(12).Select(static artist => artist.Name).ToArray() };
 
         lock (_gate)
         {
@@ -521,7 +523,11 @@ internal sealed record OnlineTrackView(
     double DurationSeconds,
     string Availability,
     bool IsPlayable,
-    bool HasMusicVideo);
+    bool HasMusicVideo,
+    long? ViewCount)
+{
+    public IReadOnlyList<string> ArtistNames { get; init; } = [];
+}
 
 internal sealed record OnlineTrackPageView(
     IReadOnlyList<OnlineTrackView> Items,

@@ -20,7 +20,7 @@ window.AuralisCreatorFeed = (() => {
       if(request){api.post('cancelPlatformExtras',{kind:request.kind});clearTimeout(request.timer);request=null;}
       observer?.disconnect();observer=null;
     }
-    function close(){cancel();active=false;api.leaveCreatorPage();}
+    function close(){cancel();gallery.close(true);active=false;api.leaveCreatorPage();}
     function send(kind,pageHandle=null){
       if(request||!allowed()||!visible())return;
       const handle=kind==='creator'?track.handle:profile.handle;
@@ -33,13 +33,50 @@ window.AuralisCreatorFeed = (() => {
       footer.hidden=!!profile&&!hasFeed()&&!error&&!request;
       footer.innerHTML=request?'<p>'+t('正在读取…')+'</p>':error?'<p>'+esc(error)+'</p><button class="secondary-button" data-community-action="more">'+t('重试')+'</button>':
         next?'<button class="secondary-button" data-community-action="more">'+t('加载更多')+'</button>':'<p>'+t(posts.size?'已加载当前可见的动态':'暂无可见动态')+'</p>';
+      if(request)footer.replaceChildren(window.AuralisLoading.create(t('正在读取…'),{initial:!posts.size,reduced:api.reduced()}));
       page.querySelector('.creator-posts').setAttribute('aria-busy',String(!!request));
       if(!request&&!error&&next&&visible()){
         observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting))send('feed',next);},{root:api.content,rootMargin:'0px 0px 120px'});observer.observe(footer);
       }
     }
-    function avatar(name,url){const image=art(url);return '<span class="comment-avatar">'+(image?'<img src="'+esc(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':esc(Array.from(name||'?')[0]))+'</span>';}
-    function imageFallbacks(node){for(const image of node.querySelectorAll('img'))image.addEventListener('error',()=>{image.hidden=true;image.parentElement.classList.add('image-unavailable');},{once:true});}
+    function avatar(name,url){const image=art(url);return '<span class="comment-avatar"><span>'+esc(Array.from(name||'?')[0])+'</span>'+(image?'<img src="'+esc(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'')+'</span>';}
+    function imageFallbacks(node){
+      for(const image of node.querySelectorAll('img')){
+        const avatar=image.closest('.comment-avatar'),tile=image.closest('.creator-image-button');
+        if(avatar){
+          const source=art(image.getAttribute('src'));let retries=0;
+          const failed=()=>{
+            image.remove();
+            const retry=document.createElement('button');retry.type='button';retry.className='creator-avatar-retry';retry.textContent='↻';
+            retry.setAttribute('aria-label',t('重试头像'));retry.title=t('重试头像');
+            retry.addEventListener('click',event=>{
+              event.stopPropagation();retries++;retry.remove();
+              image.src=window.AuralisLoading.retryImageUrl(source,retries);avatar.append(image);
+            });avatar.append(retry);
+          };
+          image.addEventListener('error',failed);
+        }else if(tile){
+          const source=art(image.getAttribute('src'));let retries=0;
+          image.addEventListener('error',()=>{
+            image.hidden=true;tile.classList.add('image-unavailable');tile.dataset.imageSource=source;
+            tile.setAttribute('aria-label',t('图片加载失败，点击重试'));
+            if(!tile.querySelector('.creator-image-retry')){
+              const label=document.createElement('span');label.className='creator-image-retry';label.textContent=t('图片加载失败，点击重试');tile.append(label);
+            }
+          });
+          image.addEventListener('load',()=>{
+            image.hidden=false;tile.classList.remove('image-unavailable');delete tile.dataset.imageSource;
+            tile.querySelector('.creator-image-retry')?.remove();tile.setAttribute('aria-label',t('查看图片')+' '+(Number(tile.dataset.index)+1));
+          });
+          tile.addEventListener('click',event=>{
+            if(!tile.classList.contains('image-unavailable'))return;
+            event.stopImmediatePropagation();event.preventDefault();
+            retries++;tile.classList.remove('image-unavailable');tile.querySelector('.creator-image-retry')?.remove();
+            image.src=window.AuralisLoading.retryImageUrl(source,retries);image.hidden=false;
+          },true);
+        }
+      }
+    }
     function receive(payload){
       if(!['creator','feed'].includes(payload?.kind))return false;
       if(!request||request.kind!==payload.kind||request.handle!==payload.handle||request.requestId!==payload.requestId||!visible()||!allowed()||context!==api.pageContext(track))return true;
@@ -65,17 +102,10 @@ window.AuralisCreatorFeed = (() => {
       }
       renderFooter();return true;
     }
-    const gallery=document.createElement('dialog');gallery.className='media-hub-dialog creator-gallery';gallery.setAttribute('aria-label',t('查看图片'));document.body.append(gallery);
-    let galleryImages=[],imageIndex=0,imageOrigin=null;
-    function renderImage(){
-      gallery.innerHTML='<header><span>'+(imageIndex+1)+' / '+galleryImages.length+'</span><button class="icon-button" data-gallery="close" aria-label="'+t('关闭')+'">×</button></header><div class="media-dialog-body"><img src="'+esc(galleryImages[imageIndex])+'" alt="'+esc(t('动态图片'))+'" referrerpolicy="no-referrer"></div><footer><button class="secondary-button" data-gallery="previous" '+(imageIndex===0?'disabled':'')+'>'+t('上一张')+'</button><button class="secondary-button" data-gallery="next" '+(imageIndex===galleryImages.length-1?'disabled':'')+'>'+t('下一张')+'</button></footer>';
-      gallery.querySelector('[data-gallery="close"]').focus();
-    }
-    gallery.addEventListener('click',e=>{const action=e.target.closest('[data-gallery]')?.dataset.gallery;if(action==='close')gallery.close();if(action==='previous'&&imageIndex>0){imageIndex--;renderImage();}if(action==='next'&&imageIndex+1<galleryImages.length){imageIndex++;renderImage();}});
-    gallery.addEventListener('close',()=>{gallery.replaceChildren();imageOrigin?.isConnected&&imageOrigin.focus({preventScroll:true});});
+    const gallery=window.AuralisPageGallery.create(api,'creator-gallery');
     function open(item){
       if(!(api.capabilities(item).includes('CreatorFeed')||api.capabilities(item).includes('CreatorProfile')))return;
-      cancel();track=item;context=api.pageContext(track);profile=null;posts.clear();next=null;error='';active=true;
+      cancel();gallery.close(true);track=item;context=api.pageContext(track);profile=null;posts.clear();next=null;error='';active=true;
       page.classList.toggle('profile-only',!hasFeed());
       page.innerHTML='<header class="page-header creator-page-header"><button class="settings-back-button" data-community-action="close" aria-label="'+t('返回')+'">←</button><div><h1 id="creatorFeedTitle" tabindex="-1">'+t('作者主页')+'</h1><p data-i18n-skip>'+esc(api.providerName(track.providerId))+'</p></div></header><section class="creator-profile"></section>'+
         (hasFeed()?'<h2>'+t('作者动态')+'</h2><p class="community-availability">'+t('仅显示平台允许访问的内容；已删除或受限内容可能不可见。')+'</p>':'')+'<div class="creator-posts"></div><div class="creator-footer" role="status"></div>';
@@ -88,15 +118,15 @@ window.AuralisCreatorFeed = (() => {
       if(button.dataset.communityAction==='more')send(profile?'feed':'creator',next);
       const post=posts.get(button.dataset.post);
       if(button.dataset.communityAction==='comments'&&post?.discussionHandle)openComments({...track,handle:post.discussionHandle,title:post.title||post.text.slice(0,100)},false);
-      if(button.dataset.communityAction==='image'&&post){galleryImages=(post.images||[]).map(art).filter(Boolean).slice(0,9);imageIndex=Number(button.dataset.index)||0;imageOrigin=button;if(galleryImages[imageIndex]){gallery.showModal();renderImage();}}
+      if(button.dataset.communityAction==='image'&&post)gallery.open((post.images||[]).map(art).filter(Boolean),Number(button.dataset.index)||0);
     });
     document.addEventListener('keydown',event=>{
       if(!visible()||document.querySelector('dialog[open]')||document.querySelector('#nowPlayingOverlay.open'))return;
       if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();close();}
     },true);
     return {open,receive,render,sync:()=>{
-      if(active&&(!allowed()||context!==api.pageContext(track))){if(gallery.open)gallery.close();close();}
-      else if(active&&api.state.currentPage!=='creator'){cancel();active=false;if(gallery.open)gallery.close();}
+      if(active&&(!allowed()||context!==api.pageContext(track))){close();}
+      else if(active&&api.state.currentPage!=='creator'){cancel();active=false;gallery.close(true);}
     }};
   }
   return {create,date,art};

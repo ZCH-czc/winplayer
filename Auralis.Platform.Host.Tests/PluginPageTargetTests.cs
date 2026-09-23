@@ -33,7 +33,7 @@ internal static class PluginPageTargetTests
         Check(!PlatformPageQueryValidation.IsValid(PluginPageQueryTests.Schema with { Submit = action }), "Query cannot implicitly navigate to another entity");
 
         async Task<PlatformResult<OnlinePageView>> Root() =>
-            await coordinator.ReadPluginGlobalPageAsync("custom.public", "query", null, "en-US", default);
+            await coordinator.ReadPluginGlobalPageAsync("custom.public", "query", null, "en-US", default, forceRefresh: true);
         try
         {
             // Every invalid document must fail before emitting any usable opaque action.
@@ -60,7 +60,7 @@ internal static class PluginPageTargetTests
             Check(Get<int>("TargetReads") == before, "Invalid routing never invokes entity page");
 
             async Task<PlatformResult<OnlinePageView>> Read(string nav, CancellationToken ct = default) =>
-                await coordinator.ReadPluginGlobalPageAsync("custom.public", "query", nav, "en-US", ct);
+                await coordinator.ReadPluginGlobalPageAsync("custom.public", "query", nav, "en-US", ct, forceRefresh: true);
             Set("TargetDocument", doc with { Actions = [new("Old schema", "backend-target-work") { Target = new("legacy-work",new("custom.public","backend-work"),"media") }] });
             var legacy = await Root();
             Check(legacy.IsSuccess, "Targets may declare a lower document schema");
@@ -68,6 +68,10 @@ internal static class PluginPageTargetTests
             Set("TargetDocument", doc);
             var profile = await Read(handle);
             Check(profile.IsSuccess && profile.Value.Title == "Creator", "Global discovery enters typed creator context");
+            var cachedReads = Get<int>("TargetReads");
+            var cached = await coordinator.ReadPluginGlobalPageAsync("custom.public", "query", handle, "en-US", default);
+            Check(cached.IsSuccess && ReferenceEquals(cached.Value, profile.Value) && Get<int>("TargetReads") == cachedReads,
+                "Returning to a valid page reuses its short-lived projection without another provider read");
             Check(Get<PlatformPageReadRequest>("LastTargetRequest") is { ContextKind: "creator", MediaId.Value: "backend-creator-9007199254740993", InputValues.Count: 0 }, "Exact ID retained; search inputs not leaked");
             Check(coordinator.GetBackendTrack(handle) is null, "Read-only navigation never mints playable media");
             var about = await Read(profile.Value.Tabs[1].Action.Handle);

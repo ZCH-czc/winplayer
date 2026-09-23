@@ -18,7 +18,8 @@ public sealed record PlatformPageEntry
         (entries.Count <= 8 && entries.All(e => e is not null && ValidId(e.Id) &&
             e.Label is { Length: > 0 and <= 80 } && e.LabelEn is { Length: > 0 and <= 80 } &&
             e.Placement is "media" or "creator" or "global" && e.Presentation is "dialog" or "page" &&
-            (!e.AcceptsCreatorContext || e.Placement == "creator") && e.DocumentVersion is 1 or 2 or 3 or 4 or 5 or 6 &&
+            (!e.AcceptsCreatorContext || e.Placement == "creator") && e.DocumentVersion is >= 1 and <= 9 &&
+            (e.DocumentVersion < 7 || e.Presentation == "page") &&
             (e.Placement != "global" || e.Presentation == "page" && e.DocumentVersion >= 3) &&
             (!(e.Presentation == "page" || e.AcceptsCreatorContext) || e.DocumentVersion >= 2)) &&
          entries.Select(e => e.Id).Distinct(StringComparer.Ordinal).Count() == entries.Count &&

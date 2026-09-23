@@ -5,6 +5,8 @@ namespace Auralis.Platform.Abstractions;
 /// <summary>Requests a short-lived stream for one provider-owned music video.</summary>
 public sealed record PlatformVideoPlaybackRequest
 {
+    /// <summary>Optional provider-owned representation ID from a previous lease; null selects automatic.</summary>
+    public string? QualityId { get; init; }
     /// <summary>Creates a video playback request.</summary>
     public PlatformVideoPlaybackRequest(PlatformEntityId videoId)
     {
@@ -21,6 +23,10 @@ public sealed record PlatformVideoPlaybackRequest
 /// </summary>
 public sealed record PlatformVideoLease
 {
+    /// <summary>Only currently playable representations, not advertised but unavailable tiers. Empty for legacy providers.</summary>
+    public IReadOnlyList<PlatformVideoQuality> Qualities { get; init; } = [];
+    /// <summary>Actual selected representation; null for legacy providers.</summary>
+    public string? SelectedQualityId { get; init; }
     /// <summary>Provider-approved alternate CDN URLs for the same representation, backend-only.</summary>
     public IReadOnlyList<Uri> AlternateUrls { get; init; } = Array.Empty<Uri>();
     /// <summary>Requests host transport without platform-name checks in the player.</summary>
@@ -76,3 +82,6 @@ public sealed record PlatformVideoLease
     /// <summary>Gets backend-only request headers required for playback.</summary>
     public IReadOnlyDictionary<string, string> RequestHeaders { get; }
 }
+
+/// <summary>Non-sensitive display metadata for an available representation. ID remains backend-only.</summary>
+public sealed record PlatformVideoQuality(string Id, string Label, int? Width = null, int? Height = null);

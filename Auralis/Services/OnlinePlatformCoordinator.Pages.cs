@@ -12,18 +12,22 @@ internal sealed partial class OnlinePlatformCoordinator
     // changes across a typed link. It cannot mint a playable track or switch providers.
     private sealed record PageContext(string Entry, PlatformEntityId? Entity, string Kind);
     private readonly Dictionary<string, PageNavigation> _pageNavigation = new(StringComparer.Ordinal);
+    private sealed record CachedPage(OnlinePageView View, DateTimeOffset Created, Func<bool> IsCurrent);
+    private readonly Dictionary<string, CachedPage> _pageReadCache = new(StringComparer.Ordinal);
+    private readonly byte[] _pageUpdateSalt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
 
     internal async Task<PlatformResult<OnlinePageView>> ReadPluginPageAsync(string mediaHandle, string entryId,
-        string? navigationHandle, string language, CancellationToken token, IReadOnlyDictionary<string, string>? inputValues = null)
-        => await ReadPageCoreAsync(mediaHandle, null, entryId, navigationHandle, language, token, inputValues).ConfigureAwait(false);
+        string? navigationHandle, string language, CancellationToken token, IReadOnlyDictionary<string, string>? inputValues = null, int? preferredPageSize = null, bool forceRefresh = false)
+        => await ReadPageCoreAsync(mediaHandle, null, entryId, navigationHandle, language, token, inputValues, preferredPageSize, forceRefresh).ConfigureAwait(false);
 
     internal async Task<PlatformResult<OnlinePageView>> ReadPluginGlobalPageAsync(string providerId, string entryId,
-        string? navigationHandle, string language, CancellationToken token, IReadOnlyDictionary<string, string>? inputValues = null)
-        => await ReadPageCoreAsync(null, providerId, entryId, navigationHandle, language, token, inputValues).ConfigureAwait(false);
+        string? navigationHandle, string language, CancellationToken token, IReadOnlyDictionary<string, string>? inputValues = null, int? preferredPageSize = null, bool forceRefresh = false)
+        => await ReadPageCoreAsync(null, providerId, entryId, navigationHandle, language, token, inputValues, preferredPageSize, forceRefresh).ConfigureAwait(false);
 
     private async Task<PlatformResult<OnlinePageView>> ReadPageCoreAsync(string? mediaHandle, string? globalProvider,
-        string entryId, string? navigationHandle, string language, CancellationToken token, IReadOnlyDictionary<string, string>? inputValues)
+        string entryId, string? navigationHandle, string language, CancellationToken token, IReadOnlyDictionary<string, string>? inputValues, int? preferredPageSize, bool forceRefresh)
     {
+        if (preferredPageSize is < 6 or > 20) return PageUnavailable();
         token.ThrowIfCancellationRequested();
         var global = globalProvider is not null;
         if (global && !PlatformPageEntry.ValidId(globalProvider)) return PageUnavailable();
@@ -64,19 +68,28 @@ internal sealed partial class OnlinePlatformCoordinator
         var route = navigation?.Route ?? entryId;
         var state = navigation?.State;
         var locale = language == "en-US" ? "en-US" : "zh-CN";
+        var cacheKey = System.Text.Json.JsonSerializer.Serialize(new object?[] { owner, entryId, navigationHandle,
+            locale, preferredPageSize, values.OrderBy(p => p.Key, StringComparer.Ordinal).ToArray() });
+        if (!forceRefresh)
+            lock (_gate)
+                if (_pageReadCache.TryGetValue(cacheKey, out var cached) &&
+                    DateTimeOffset.UtcNow - cached.Created < TimeSpan.FromSeconds(90) && cached.IsCurrent())
+                    return PlatformResult<OnlinePageView>.Success(cached.View);
         var result = pageContext.Kind == "global"
             ? await _backend.Router.RouteAsync<IPlatformGlobalPagesCapability, PlatformPageDocument>(providerId,
-                (c, ct) => c.ReadGlobalPageAsync(new(providerId, route, state, locale) { InputValues = values }, ct), token).ConfigureAwait(false)
+                (c, ct) => c.ReadGlobalPageAsync(new(providerId, route, state, locale) { InputValues = values, PreferredPageSize = preferredPageSize }, ct), token).ConfigureAwait(false)
             : await _backend.Router.RouteAsync<IPlatformPagesCapability, PlatformPageDocument>(providerId,
                 (c, ct) => c.ReadPageAsync(new(pageContext.Entity!.Value, route, state, locale) {
-                    ContextKind = pageContext.Kind, InputValues = values }, ct), token).ConfigureAwait(false);
+                    ContextKind = pageContext.Kind, InputValues = values, PreferredPageSize = preferredPageSize }, ct), token).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
         if (!IsCurrent() || (navigation is not null && !navigation.IsCurrent())) return PageUnavailable();
         if (!result.IsSuccess) return PlatformResult<OnlinePageView>.Failure(result.Error!);
         if (!PlatformPageValidation.IsValid(result.Value) || result.Value.Version > activeEntry.DocumentVersion ||
-            (navigation?.Append == true && (result.Value.Tabs.Count > 0 || result.Value.Query is not null)) || result.Value.Cards.Any(c =>
+            (navigation?.Append == true && (result.Value.Tabs.Count > 0 || result.Value.Query is not null || result.Value.Navigation.Count > 0 || result.Value.Updates is not null)) || result.Value.Cards.Any(c =>
             c.Media is { } media && !AcceptsPageMedia(providerId, provider.Value.Capabilities, media) ||
             c.Discussion is { } discussion && (!OwnsEntity(providerId, discussion) ||
+                !provider.Value.Capabilities.Contains(PlatformCapabilityKind.Comments)) ||
+            c.Quote?.Discussion is { } quoted && (!OwnsEntity(providerId, quoted) ||
                 !provider.Value.Capabilities.Contains(PlatformCapabilityKind.Comments))))
             return PlatformResult<OnlinePageView>.Failure(PlatformErrorCode.InvalidResponse, "插件页面格式不受支持或超出限制。");
         // Validate the complete document before registering any link or authorizing artwork.
@@ -84,7 +97,8 @@ internal sealed partial class OnlinePlatformCoordinator
             OwnsEntity(providerId, target.Entity) && provider.Value.Capabilities.Contains(PlatformCapabilityKind.Pages) &&
             provider.Value.Pages.Any(p => p.Id == target.EntryId && p.Presentation == "page" &&
                 (target.ContextKind == "creator" ? p.Placement == "creator" && p.AcceptsCreatorContext : p.Placement == "media"));
-        if (result.Value.Actions.Concat(result.Value.Cards.SelectMany(c => c.Actions))
+        if (result.Value.Actions.Concat(result.Value.Cards.SelectMany(c => c.Actions.Concat(
+                new[] { c.Open, c.AuthorAction, c.Quote?.AuthorAction }.OfType<PlatformPageAction>())))
             .Any(a => a.Target is { } target && !AcceptsTarget(target)))
             return PlatformResult<OnlinePageView>.Failure(PlatformErrorCode.InvalidResponse, "插件页面格式不受支持或超出限制。");
         var artwork = await _backend.GetCommentArtworkAuthorizationAsync(providerId, token).ConfigureAwait(false);
@@ -103,6 +117,9 @@ internal sealed partial class OnlinePlatformCoordinator
         lock (_gate)
         {
             string? Art(Uri? uri) => RegisterCommentAvatar(providerId, uri, artwork.Policy, () => artwork.IsActive() && IsCurrent());
+            string? ReadingArt(Uri? uri) => RegisterCommentAvatar(providerId, uri, artwork.Policy, () => artwork.IsActive() && IsCurrent(), fullImage: true);
+            OnlinePageTextRun[] Body(IReadOnlyList<PlatformPageTextRun> runs) => runs.Select(r => new OnlinePageTextRun(r.Text, Art(r.Image))).ToArray();
+            string? Subject(PlatformEntityId? id) => id is { } subject ? _community.Add("discussion", subject, collection, isActive: IsCurrent) : null;
             OnlinePageAction ProjectAction(PlatformPageAction action, bool isAppend, PlatformPageQuery? query = null)
             {
                 while (_pageNavigation.Count >= 512) _pageNavigation.Remove(_pageNavigation.MinBy(p => p.Value.Created).Key);
@@ -115,20 +132,36 @@ internal sealed partial class OnlinePlatformCoordinator
                     DateTimeOffset.UtcNow, isAppend, collection, isAppend ? chain : [], query, targetValues, targetContext));
                 return new(action.Label, handle);
             }
-            return PlatformResult<OnlinePageView>.Success(new(doc.Title, doc.Description, doc.Layout,
-                doc.Cards.Select(c => new OnlinePageCard(c.Title, c.Text, Art(c.Image), c.PublishedAt,
+            var projected = new OnlinePageView(doc.Title, doc.Description, doc.Layout,
+                doc.Cards.Select(c => new OnlinePageCard(c.Title, c.Text, ReadingArt(c.Image), c.PublishedAt,
                     c.Actions.Select(a => ProjectAction(a, false)).ToArray()) {
                     Handle = c.Id is null ? null : _community.Add("page-card", new(providerId, c.Id), collection, isActive: IsCurrent),
-                    Author = c.Author, Avatar = Art(c.Avatar), Images = c.Images.Select(Art).OfType<string>().ToArray(),
+                    Author = c.Author, Avatar = Art(c.Avatar), Images = c.Images.Select(ReadingArt).OfType<string>().ToArray(),
                     DiscussionHandle = c.Discussion is { } subject ? _community.Add("discussion", subject, collection, isActive: IsCurrent) : null,
                     CommentCount = c.CommentCount,
+                    LikeCount = c.LikeCount, RepostCount = c.RepostCount,
+                    Body = Body(c.Body), AuthorAction = c.AuthorAction is null ? null : ProjectAction(c.AuthorAction, false),
+                    Quote = c.Quote is not { } q ? null : new(q.Status, q.Title, q.Text, Body(q.Body), q.Author,
+                        Art(q.Avatar), q.AuthorAction is null ? null : ProjectAction(q.AuthorAction, false), q.PublishedAt,
+                        q.Images.Select(ReadingArt).OfType<string>().ToArray(), Subject(q.Discussion), q.CommentCount),
+                    Open = c.Open is null ? null : ProjectAction(c.Open, false),
                     Media = c.Media is null ? null : RegisterPageMedia(c.Media, IsCurrent, artwork.Policy, artwork.IsActive)
                 }).ToArray(), doc.Actions.Select(a => ProjectAction(a, false)).ToArray()) {
-                    Image = Art(doc.Image), Append = append, CollectionHandle = collection,
+                    Version = doc.Version, Image = Art(doc.Image), Append = append, CollectionHandle = collection,
+                    Navigation = doc.Navigation.Select(n => new OnlinePageNavigationItem(ProjectAction(n.Action, false), Art(n.Image), n.Selected)).ToArray(),
+                    Updates = doc.Updates is not { } updates ? null : new(ProjectAction(updates.Check, false),
+                        ProjectAction(updates.Reload, false), Convert.ToHexString(System.Security.Cryptography.HMACSHA256.HashData(
+                            _pageUpdateSalt, System.Text.Encoding.UTF8.GetBytes(providerId + "\n" + updates.Revision))), updates.IntervalSeconds),
                     Tabs = doc.Tabs.Select(t => new OnlinePageTab(ProjectAction(t.Action, false), t.Selected)).ToArray(),
                     Query = doc.Query is null ? null : ProjectQuery(doc.Query),
                     Next = doc.Next is null ? null : ProjectAction(doc.Next, true)
-                });
+                };
+            foreach (var stale in _pageReadCache.Where(p => !p.Value.IsCurrent() ||
+                DateTimeOffset.UtcNow - p.Value.Created > TimeSpan.FromSeconds(90)).Select(p => p.Key).ToArray())
+                _pageReadCache.Remove(stale);
+            while (_pageReadCache.Count >= 32) _pageReadCache.Remove(_pageReadCache.MinBy(p => p.Value.Created).Key);
+            _pageReadCache[cacheKey] = new(projected, DateTimeOffset.UtcNow, IsCurrent);
+            return PlatformResult<OnlinePageView>.Success(projected);
             OnlinePageQuery ProjectQuery(PlatformPageQuery query)
             {
                 var snapshot = PlatformPageQueryValidation.Snapshot(query);
@@ -159,19 +192,34 @@ internal sealed partial class OnlinePlatformCoordinator
 
 internal sealed record OnlinePageAction(string Label, string Handle);
 internal sealed record OnlinePageTab(OnlinePageAction Action, bool Selected);
+internal sealed record OnlinePageNavigationItem(OnlinePageAction Action, string? Image, bool Selected);
+internal sealed record OnlinePageUpdates(OnlinePageAction Check, OnlinePageAction Reload, string Fingerprint, int IntervalSeconds);
 internal sealed record OnlinePageQuery(OnlinePageAction Submit, IReadOnlyList<PlatformPageQueryField> Fields);
+internal sealed record OnlinePageTextRun(string Text, string? Image);
+internal sealed record OnlinePageQuote(string Status, string Title, string Text, IReadOnlyList<OnlinePageTextRun> Body,
+    string Author, string? Avatar, OnlinePageAction? AuthorAction, DateTimeOffset? PublishedAt,
+    IReadOnlyList<string> Images, string? DiscussionHandle, long? CommentCount);
 internal sealed record OnlinePageCard(string Title, string Text, string? Image, DateTimeOffset? PublishedAt, IReadOnlyList<OnlinePageAction> Actions)
 {
+    public IReadOnlyList<OnlinePageTextRun> Body { get; init; } = [];
+    public OnlinePageAction? AuthorAction { get; init; }
+    public OnlinePageQuote? Quote { get; init; }
+    public OnlinePageAction? Open { get; init; }
     public string? Handle { get; init; }
     public string Author { get; init; } = "";
     public string? Avatar { get; init; }
     public IReadOnlyList<string> Images { get; init; } = [];
     public string? DiscussionHandle { get; init; }
     public long? CommentCount { get; init; }
+    public long? LikeCount { get; init; }
+    public long? RepostCount { get; init; }
     public OnlineTrackView? Media { get; init; }
 }
 internal sealed record OnlinePageView(string Title, string Description, string Layout, IReadOnlyList<OnlinePageCard> Cards, IReadOnlyList<OnlinePageAction> Actions)
 {
+    public IReadOnlyList<OnlinePageNavigationItem> Navigation { get; init; } = [];
+    public OnlinePageUpdates? Updates { get; init; }
+    public int Version { get; init; } = 1;
     public IReadOnlyList<OnlinePageTab> Tabs { get; init; } = [];
     public OnlinePageQuery? Query { get; init; }
     public string? Image { get; init; }

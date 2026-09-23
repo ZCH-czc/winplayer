@@ -19,15 +19,19 @@ const server=http.createServer(async(req,res)=>{
   const origin='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({channel:'msedge',headless:true});
   try{for(const theme of ['light','dark'])for(const scale of [1,1.5,2]){
     const context=await browser.newContext({viewport:scale===2?{width:640,height:560}:{width:1280,height:820},deviceScaleFactor:scale,reducedMotion:scale===1.5?'reduce':'no-preference'});
-    const page=await context.newPage(),messages=[],errors=[];let fail=false;
+    const page=await context.newPage(),messages=[],errors=[];let fail=false,brokenReads=0;
     page.on('pageerror',e=>errors.push(e.message));
-    await page.route('**/*',r=>r.request().url().startsWith(origin)?r.continue():r.abort());
+    await page.route('**/*',r=>{
+      if(new URL(r.request().url()).pathname==='/broken'&&r.request().url().startsWith('https://platform-art.auralis.local/')){brokenReads++;return r.fulfill({status:404,body:''});}
+      return r.request().url().startsWith(origin)?r.continue():r.abort();
+    });
     const provider={id:'independent.media',name:'Independent studio',configured:true,pageRevision:1,capabilities:['Pages','GlobalPages','StreamResolution'],
       pages:[{id:'catalogue',label:'作品目录',labelEn:'Catalogue',placement:'global',presentation:'page',documentVersion:6}]};
     const media=(key,title,availability='available')=>({providerId:provider.id,handle:'track-'+key.repeat(24),id:'track-'+key.repeat(24),
       kind:'online',sourceName:provider.name,title,artist:'Original demonstration artist',album:'Independent release',
       durationSeconds:204,availability,isPlayable:availability!=='unavailable',hasMusicVideo:false,coverUrl:null});
     const first=media('a','Quiet Geometry'),second=media('b','Evening Colors','previewonly'),blocked=media('c','Unavailable work','unavailable');
+    second.coverUrl='https://platform-art.auralis.local/broken';
     const doc={title:'Catalogue',description:'Plugin-owned works. Browse freely; play or queue only when you choose.',layout:'cards',
       append:false,collectionHandle:'catalogue',actions:[],cards:[
         {handle:'card-a',title:'Quiet Geometry',text:'An original demonstration. Media metadata stays separate from stream resolution.',media:first},
@@ -55,6 +59,14 @@ const server=http.createServer(async(req,res)=>{
     assert.equal(plays().length,0);assert(!messages.slice(start).some(m=>m.action==='prefetchPlatformTrack'&&m.handle),'page read does not prefetch works');
     const play=route.locator('[data-page-media="play"]'),enqueue=route.locator('[data-page-media="enqueue"]');
     assert.equal(await play.count(),3);assert(await play.nth(2).isDisabled());assert(await enqueue.nth(2).isDisabled());
+    const covers=route.locator('[data-media-cover]');
+    assert.equal(await covers.count(),3,'missing artwork still reserves an explicit entry');
+    assert(await covers.nth(2).isDisabled());
+    await covers.nth(1).getByText('Image unavailable. Click to retry',{exact:true}).waitFor();
+    assert.equal(brokenReads,1,'failed images never retry automatically');
+    await covers.nth(1).click();
+    await covers.nth(1).getByText('Image unavailable. Click to retry',{exact:true}).waitFor();
+    assert.equal(brokenReads,2);assert.equal(plays().length,0,'artwork retry cannot play media');
     await enqueue.first().focus();await page.keyboard.press('Enter');await enqueue.first().click();
     assert.equal(plays().length,0,'enqueue never plays');
     if(scale===2){
@@ -62,10 +74,10 @@ const server=http.createServer(async(req,res)=>{
       await page.waitForFunction(()=>document.querySelector('#miniTitle')?.textContent==='Quiet Geometry');
       assert.equal(plays().at(-1)?.handle,first.handle,'empty queue transport plays queued media');
     }else{
-      fail=true;await play.first().click();
+      fail=true;await covers.first().click();
       await page.getByText('Synthetic playback failure',{exact:true}).waitFor();
       assert(await route.isVisible(),'failure preserves page');
-      await play.first().focus();await page.keyboard.press('Enter');
+      await route.locator('[data-media-title]').first().focus();await page.keyboard.press('Enter');
     }
     await page.waitForFunction(()=>document.querySelector('#playerBar')?.textContent.includes('Quiet Geometry'));
     const count=plays().length;

@@ -19,9 +19,9 @@ public sealed record PlatformHostRequirements
 /// <summary>Immutable, host-owned compatibility profile. Never inferred from installed plugin code.</summary>
 public sealed class PlatformHostCompatibility
 {
-public const string SdkVersion = "2.10.0";
+    public const string SdkVersion = "2.15.0";
     public static PlatformHostCompatibility Current { get; } = new(new Version(SdkVersion),
-        ["settings.v1", "settings.v2", "credential-aliases.v1", "native-login.v1", "track-details.v1", "lyrics-lookup.v1", "video-lease.v2", "comment-artwork.v1", "creator-profile.v1", "creator-feed.v1", "comment-replies.v1", "declarative-pages.v1", "creator-search.v1", "declarative-pages.v2", "declarative-pages.v3", "declarative-pages.v4", "declarative-pages.v5", "declarative-pages.v6", "global-pages.v1"], 5);
+        ["settings.v1", "settings.v2", "credential-aliases.v1", "native-login.v1", "track-details.v1", "lyrics-lookup.v1", "video-lease.v2", "video-lease.v3", "page-batch.v1", "public-metrics.v1", "comment-artwork.v1", "creator-profile.v1", "creator-feed.v1", "comment-replies.v1", "declarative-pages.v1", "creator-search.v1", "declarative-pages.v2", "declarative-pages.v3", "declarative-pages.v4", "declarative-pages.v5", "declarative-pages.v6", "declarative-pages.v7", "declarative-pages.v8", "declarative-pages.v9", "global-pages.v1"], 5);
 
     public PlatformHostCompatibility(Version version, IEnumerable<string> features, int maximumManifestSchema = 5)
     {

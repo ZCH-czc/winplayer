@@ -498,35 +498,40 @@ public sealed partial class HttpMediaTransportSession : IMediaTransportSession
 
     private void TrimSessionCache()
     {
-        while (_sessionCache.Count > MaximumSessionCacheFiles ||
-               _sessionCache.Values.Sum(static entry => entry.SizeBytes) > MaximumSessionCacheBytes)
+        var bytes = _sessionCache.Values.Sum(static entry => entry.SizeBytes);
+        if (_sessionCache.Count <= MaximumSessionCacheFiles && bytes <= MaximumSessionCacheBytes) return;
+        // Snapshot each eligible entry once. A sharing violation must neither forget our
+        // ownership nor repeatedly select the same locked victim in an unbounded loop.
+        foreach (var victim in _sessionCache.Where(item => item.Value.Pins == 0)
+                     .OrderBy(item => item.Value.LastAccessUtc).ToArray())
         {
-            var victim = _sessionCache
-                .Where(item => item.Value.Pins == 0)
-                .OrderBy(static item => item.Value.LastAccessUtc)
-                .FirstOrDefault();
-            if (string.IsNullOrEmpty(victim.Key))
-            {
+            if (_sessionCache.Count <= MaximumSessionCacheFiles && bytes <= MaximumSessionCacheBytes)
                 break;
-            }
 
-            _sessionCache.Remove(victim.Key);
-            TryDelete(victim.Value.Path);
+            if (TryDelete(victim.Value.Path))
+            {
+                _sessionCache.Remove(victim.Key);
+                bytes -= victim.Value.SizeBytes;
+            }
+            // Retain failed victims in the cache for a later trim or final session cleanup.
+            // The soft target may be exceeded while all eligible files are externally locked.
         }
     }
 
-    private static void TryDelete(string path)
+    private static bool TryDelete(string path)
     {
         try
         {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
+            // File.Delete is already idempotent for a missing file. File.Exists would also
+            // hide access failures and incorrectly report those files as successfully cleaned.
+            File.Delete(path);
+            return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            // The OS will release a stale temporary stream file after the media pipeline closes it.
+            // A failed delete is not scheduled by the OS. The caller must retain ownership
+            // where possible; files still blocked at shutdown rely on later stale maintenance.
+            return false;
         }
     }
 

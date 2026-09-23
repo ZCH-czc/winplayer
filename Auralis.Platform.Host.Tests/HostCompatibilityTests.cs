@@ -74,6 +74,36 @@ internal static class HostCompatibilityTests
         await Reject(media,PlatformPluginDiagnosticCode.HostSdkIncompatible,new(new Version(2,9,0),current.Features));
         await Reject(media,PlatformPluginDiagnosticCode.HostFeatureUnsupported,
             new(new Version(2,10,0),current.Features.Where(f=>f!="declarative-pages.v6").ToArray()));
+        var reading=(JsonObject)media.DeepClone();
+        reading["providers"]![0]!["pages"]![0]!["documentVersion"]=7;
+        ((JsonArray)reading["hostRequirements"]!["requiredFeatures"]!).Add("declarative-pages.v7");
+        await Reject(reading,PlatformPluginDiagnosticCode.ManifestInvalid); // New reading vocabulary must declare its SDK floor.
+        reading["hostRequirements"]!["minimumHostSdkVersion"]="2.11.0";
+        Check((await Discover(reading)).Plugins.Single().Providers.Count==1,"V7 reading discovery remains inert");
+        await Reject(reading,PlatformPluginDiagnosticCode.HostSdkIncompatible,new(new Version(2,10,0),current.Features));
+        await Reject(reading,PlatformPluginDiagnosticCode.HostFeatureUnsupported,
+            new(new Version(2,11,0),current.Features.Where(f=>f!="declarative-pages.v7").ToArray()));
+        var rich=(JsonObject)reading.DeepClone();
+        rich["providers"]![0]!["pages"]![0]!["documentVersion"]=8;
+        ((JsonArray)rich["hostRequirements"]!["requiredFeatures"]!).Add("declarative-pages.v8");
+        await Reject(rich,PlatformPluginDiagnosticCode.ManifestInvalid);
+        rich["hostRequirements"]!["minimumHostSdkVersion"]="2.12.0";
+        Check((await Discover(rich)).Plugins.Count==1,"V8 inert declaration accepted");
+        await Reject(rich,PlatformPluginDiagnosticCode.HostSdkIncompatible,new(new Version(2,11,0),current.Features));
+        await Reject(rich,PlatformPluginDiagnosticCode.HostFeatureUnsupported,new(new Version(2,12,0),current.Features.Where(f=>f!="declarative-pages.v8").ToArray()));
+        var live=(JsonObject)rich.DeepClone();
+        live["providers"]![0]!["pages"]![0]!["documentVersion"]=9;
+        ((JsonArray)live["hostRequirements"]!["requiredFeatures"]!).Add("declarative-pages.v9");
+        await Reject(live,PlatformPluginDiagnosticCode.ManifestInvalid);
+        live["hostRequirements"]!["minimumHostSdkVersion"]="2.13.0";
+        Check((await Discover(live)).Plugins.Count==1,"V9 inert declaration accepted");
+        await Reject(live,PlatformPluginDiagnosticCode.HostSdkIncompatible,new(new Version(2,12,0),current.Features));
+        await Reject(live,PlatformPluginDiagnosticCode.HostFeatureUnsupported,new(new Version(2,13,0),current.Features.Where(f=>f!="declarative-pages.v9").ToArray()));
+        var richFeatures=(JsonArray)rich["hostRequirements"]!["requiredFeatures"]!;richFeatures.RemoveAt(richFeatures.Count-1);
+        await Reject(rich,PlatformPluginDiagnosticCode.ManifestInvalid);
+        var readingFeatures=(JsonArray)reading["hostRequirements"]!["requiredFeatures"]!;
+        readingFeatures.RemoveAt(readingFeatures.Count-1);
+        await Reject(reading,PlatformPluginDiagnosticCode.ManifestInvalid);
         ((JsonArray)media["hostRequirements"]!["requiredFeatures"]!).RemoveAt(7);
         await Reject(media,PlatformPluginDiagnosticCode.ManifestInvalid);
         ((JsonArray)targets["hostRequirements"]!["requiredFeatures"]!).RemoveAt(6);

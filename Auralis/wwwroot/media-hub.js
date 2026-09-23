@@ -5,7 +5,7 @@ window.AuralisMediaHub = (() => {
     const esc = api.escape;
     const state = api.state;
     const t = text => window.AuralisI18n?.t(text) || text;
-    let lists = [], selected = '', saveTarget = null, requestId = 0, trackKey = '', panelKind = '', nextPage = null;
+    let lists = [], selected = '', saveTarget = null, requestId = 0, trackKey = '', panelKind = '';
     const pending = new Map();
     const metadataPending = new Map(), metadataAttempted = new Set(), metadataForced = new Set();
     let metadataObserver = null, metadataQueue = [];
@@ -61,9 +61,7 @@ window.AuralisMediaHub = (() => {
       }
       pumpMetadata();
     }
-    let parts = [], comments = [], commentTrack = null, commentsError = '', failedPage = null;
-    let renderedComments = 0, commentObserver = null, followsPlayback = false;
-    let commentSort = 'recommended', replyRoot = null, replyNext = null, replyError = '', replyItems = [];
+    let parts = [], commentTrack = null, followsPlayback = false;
     let danmaku = [], danmakuTrack = '', lastTime = -1, frame = 0, danmakuIndex = 0;
     let closeAnimation = null, returnFocus = null, listMutation = null, lastListSignature = '', lastRenderedList = '';
     let boundsFrame = 0, boundsUntil = 0, lastBounds = '', lastOverlayOpen = false;
@@ -77,7 +75,18 @@ window.AuralisMediaHub = (() => {
     dialog.setAttribute('aria-labelledby', 'mediaDialogTitle');
     document.body.append(dialog);
     const creatorFeed = window.AuralisCreatorFeed.create(api, (track,follow) => openComments(track,follow));
-    const pluginPages = window.AuralisPluginPages.create(api, (track,follow) => openComments(track,follow));
+    const pageDiscussion = window.AuralisPageDiscussion.create(api,()=>++requestId,{
+      beforeOpen:()=>{if(dialog.open&&panelKind==='comments'){closeDialog(true);returnFocus=null;}}
+    });
+    const drawerDiscussion = window.AuralisPageDiscussion.create(api,()=>++requestId,{
+      beforeOpen:()=>pageDiscussion.close(),
+      active:subject=>dialog.open&&!closeAnimation&&panelKind==='comments'&&
+        (!followsPlayback||($('#nowPlayingOverlay').classList.contains('open')&&api.current()?.handle===subject.handle)),
+      canAutoLoad:()=>dialog.open&&!closeAnimation,
+      heading:()=>dialog.querySelector('#mediaDialogTitle'),
+      invalidated:()=>closeDialog(true)
+    });
+    const pluginPages = window.AuralisPluginPages.create(api, (track,follow) => openComments(track,follow),pageDiscussion);
     const creatorSearch = window.AuralisCreatorSearch.create(api, item => {
       const entry=pluginPages.creator(item);
       if(entry?.acceptsCreatorContext)pluginPages.open(item,entry);else creatorFeed.open(item);
@@ -91,6 +100,11 @@ window.AuralisMediaHub = (() => {
     $('#embeddedVideoSurface').append(videoCanvas);
     $('#embeddedVideoSurface').insertAdjacentHTML('beforeend', '<div class="video-awaiting-picture"><span>视频画面准备中；暂停时可点击播放继续</span></div>');
     $('#embeddedVideoPage header').insertAdjacentHTML('beforeend', '<button class="secondary-button" data-media-action="video-retry" hidden>重试视频</button>');
+    const qualityControl=document.createElement('label');qualityControl.className='video-quality-control';qualityControl.hidden=true;
+    const qualityLabel=document.createElement('span'),qualitySelect=document.createElement('select');
+    let automaticVideoQuality=true;
+    qualitySelect.id='videoQuality';qualityControl.append(qualityLabel,qualitySelect);$('#embeddedVideoPage header').append(qualityControl);
+    qualitySelect.addEventListener('change',()=>setVideo(true,qualitySelect.value||null));
     function stopPictures(clear = false) {
       pictureGeneration++; clearTimeout(frameTimer); frameTimer = 0;
       frameAbort?.abort(); frameAbort = null;
@@ -139,8 +153,10 @@ window.AuralisMediaHub = (() => {
         returnFocus = document.activeElement;
         dialog.innerHTML = '<header><h2 id="mediaDialogTitle"></h2><button class="icon-button" data-media-action="close" aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><p class="media-dialog-context media-context" data-i18n-skip hidden></p><div class="media-dialog-body"></div>';
       }
+      if (panelKind !== 'comments') drawerDiscussion.close();
       dialog.classList.toggle('is-comments', panelKind === 'comments');
-      dialog.querySelector('.media-dialog-context').hidden = panelKind !== 'comments';
+      dialog.querySelector('.media-dialog-context').hidden = true;
+      dialog.querySelector('.media-dialog-body').classList.toggle('discussion-surface',panelKind==='comments');
       $('#mediaDialogTitle').textContent = title;
       dialog.querySelector('.media-dialog-body').innerHTML = body;
       if (draft !== undefined && $('#savedPlaylistName')) { $('#savedPlaylistName').value = draft; }
@@ -158,21 +174,20 @@ window.AuralisMediaHub = (() => {
       if (!dialog.open || closeAnimation) return;
       // Cancel at the start, not the end, of dismissal. A response arriving during
       // the closing animation must not cancel that animation and reopen the panel.
-      if (panelKind) { pending.delete(panelKind); api.post('cancelPlatformExtras', {kind:panelKind}); }
-      commentObserver?.disconnect(); commentObserver = null;
-      cancelReplies();
+      if (panelKind && pending.delete(panelKind)) api.post('cancelPlatformExtras', {kind:panelKind});
+      drawerDiscussion.close(true);
       if (immediate || api.reduced()) { dialog.close(); return; }
       dialog.classList.add('is-closing');
       closeAnimation = dialog.animate([{opacity:1,transform:'none'},{opacity:0,transform:panelKind === 'comments' ? 'translateX(28px)' : 'translateY(6px)'}], {duration:140,easing:'ease-in'});
       const animation = closeAnimation;
       animation.finished.then(() => { if (closeAnimation === animation) { closeAnimation = null; dialog.close(); animation.cancel(); } }).catch(() => {});
     }
-    dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
+    dialog.addEventListener('cancel', event => { event.preventDefault(); if(panelKind==='comments'&&drawerDiscussion.back())return; closeDialog(); });
     dialog.addEventListener('close', () => {
       if (dialog.open) return; // A queued close event may arrive after a rapid reopen.
-      if (panelKind) { pending.delete(panelKind); api.post('cancelPlatformExtras', {kind:panelKind}); }
+      if (panelKind && pending.delete(panelKind)) api.post('cancelPlatformExtras', {kind:panelKind});
       saveTarget = null; panelKind = ''; listMutation = null;
-      commentObserver?.disconnect(); commentObserver = null;
+      drawerDiscussion.close();
       if (returnFocus?.isConnected) returnFocus.focus({preventScroll:true});
       returnFocus = null; videoBounds(); startDanmaku();
     });
@@ -189,25 +204,23 @@ window.AuralisMediaHub = (() => {
     const canRequestExtras = (track, kind) => hasCapability(track, kind === 'comments' ? 'Comments' : 'MediaExtras');
     function request(kind, pageHandle) {
       if (pending.has(kind)) return;
-      const track = kind === 'comments' ? commentTrack : api.current();
+      const track = api.current();
       if (!canRequestExtras(track, kind)) return;
       const id = ++requestId;
       pending.set(kind, { id, handle: track.handle, pageHandle });
-      api.post('requestPlatformExtras', { handle: track.handle, kind, requestId: id, pageHandle, sort:commentSort });
-      if (kind === 'comments') renderComments();
+      api.post('requestPlatformExtras', { handle: track.handle, kind, requestId: id, pageHandle });
     }
     function receiveExtras(payload) {
+      if (drawerDiscussion.receive(payload) || pageDiscussion.receive(payload)) return;
       if (creatorFeed.receive(payload)) return;
-      if (payload?.kind === 'replies') { receiveReplies(payload); return; }
       const current = pending.get(payload?.kind);
-      if (!current || current.id !== payload.requestId || current.handle !== payload.handle || (payload.kind === 'comments' ? commentTrack : api.current())?.handle !== payload.handle) return;
-      if (!canRequestExtras(payload.kind === 'comments' ? commentTrack : api.current(), payload.kind)) return;
+      if (!current || current.id !== payload.requestId || current.handle !== payload.handle || api.current()?.handle !== payload.handle) return;
+      if (!canRequestExtras(api.current(), payload.kind)) return;
       pending.delete(payload.kind);
       if (payload.error) {
         if (payload.kind === 'danmaku') { danmakuTrack = payload.handle; api.toast(payload.error.message || '此平台暂不提供弹幕'); }
         else if (dialog.open && panelKind === payload.kind) {
-          if (payload.kind === 'comments') { commentsError = payload.error.message || '评论暂不可用'; failedPage = current.pageHandle; renderComments(); }
-          else openDialog('分 P', `<p role="status">${esc(payload.error.message || '此平台暂不支持这项功能')}</p><button class="secondary-button" data-media-action="retry-extras">重试</button>`);
+          openDialog('分 P', `<p role="status">${esc(payload.error.message || '此平台暂不支持这项功能')}</p><button class="secondary-button" data-media-action="retry-extras">重试</button>`);
         }
         return;
       }
@@ -216,117 +229,16 @@ window.AuralisMediaHub = (() => {
         danmakuTrack = payload.handle;
         clearDanmaku(); startDanmaku();
       } else if (payload.kind === 'parts') {
-        parts = (payload.items || []).map(t => api.normalize(t, commentTrack?.providerId)).filter(Boolean);
+        parts = (payload.items || []).map(t => api.normalize(t, api.current()?.providerId)).filter(Boolean);
         if (dialog.open && panelKind === 'parts') openDialog('分 P', parts.length ? `<div class="media-parts">${parts.map((p,i) => `<button class="media-list-item" data-media-action="part" data-index="${i}"><strong>${esc(p.title)}</strong><span>${api.formatTime(p.durationSeconds)}</span></button>`).join('')}</div>` : '<p>这个视频没有可切换的分 P。</p>');
-      } else {
-        const known = new Set(comments.map(c=>c.handle).filter(Boolean));
-        const batch = (payload.items || []).slice(0,100).filter(c=>!c.handle || !known.has(c.handle));
-        comments.push(...batch);
-        nextPage = payload.nextPageHandle !== current.pageHandle ? payload.nextPageHandle : null;
-        commentsError = ''; failedPage = null;
-        if (dialog.open && panelKind === 'comments') renderComments();
       }
-    }
-    function renderComments() {
-      if (!dialog.open || panelKind !== 'comments') return;
-      if (!dialog.querySelector('.media-comments')) {
-        openDialog(t('评论'), `<div class="comment-sort" aria-label="${t('评论排序')}"><button class="secondary-button" data-media-action="sort-comments" data-sort="recommended" aria-pressed="${commentSort==='recommended'}">${t('推荐')}</button><button class="secondary-button" data-media-action="sort-comments" data-sort="newest" aria-pressed="${commentSort==='newest'}">${t('最新')}</button></div><p class="community-availability">${t('仅显示平台允许访问的内容；已删除或受限内容可能不可见。')}</p><div class="media-comments"></div><div class="comments-footer" role="status"></div>`);
-        dialog.querySelector('.media-dialog-body').tabIndex = 0;
-        renderedComments = 0;
-      }
-      dialog.querySelector('.media-context').textContent = commentTrack?.title || '';
-      const list = dialog.querySelector('.media-comments');
-      // Append only. Previously read nodes, loaded avatars and scroll anchors remain intact.
-      for (const [offset,c] of comments.slice(renderedComments).entries()) {
-        const avatar = typeof c.avatarUrl === 'string' && /^https:\/\/platform-art\.auralis\.local\/[a-z0-9-]+$/i.test(c.avatarUrl) ? c.avatarUrl : '';
-        const row = document.createElement('article'); row.setAttribute('data-i18n-skip', '');
-        row.innerHTML = `<span class="comment-avatar" aria-hidden="true"><span>${esc(Array.from(c.author || '?')[0])}</span>${avatar ? `<img src="${esc(avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ''}</span><div class="comment-content"><strong>${esc(c.author)}</strong><p>${commentText(c)}</p><div class="comment-meta"><small>♡ ${Math.max(0,Number(c.likeCount)||0)}</small>${window.AuralisCreatorFeed.date(c.publishedAt,esc)}</div>${c.handle && Number(c.replyCount)>0 && hasCapability(commentTrack,'CommentReplies') ? `<button class="secondary-button comment-replies-button" data-media-action="replies" data-index="${renderedComments+offset}" aria-expanded="false">${t('展开回复')} · ${Math.max(0,Number(c.replyCount)||0)}</button>` : ''}</div>`;
-        row.querySelector('.comment-avatar img')?.addEventListener('error', event => event.target.remove(), {once:true});
-        for (const img of row.querySelectorAll('.comment-emote')) img.addEventListener('error', () => img.replaceWith(document.createTextNode(img.alt)), {once:true});
-        list.append(row);
-      }
-      renderedComments = comments.length;
-      const loading = pending.has('comments');
-      list.setAttribute('aria-busy', String(loading));
-      const footerFocused = dialog.querySelector('.comments-footer').contains(document.activeElement);
-      dialog.querySelector('.comments-footer').innerHTML = loading ? '<p>正在读取…</p>' : commentsError ? `<div class="media-inline-error"><p>${esc(commentsError)}</p><button class="secondary-button" data-media-action="retry-extras">重试</button></div>` : nextPage ? '<button class="secondary-button" data-media-action="more-comments">加载更多</button>' : `<p>${t(comments.length ? '已加载当前可见的评论' : '暂无评论。')}</p>`;
-      if (footerFocused) dialog.querySelector('.media-dialog-body').focus({preventScroll:true});
-      commentObserver?.disconnect();
-      if (!loading && !commentsError && nextPage) {
-        commentObserver = new IntersectionObserver(entries => {
-          if (entries.some(entry => entry.isIntersecting) && dialog.open && panelKind === 'comments' && !commentsError && !pending.has('comments') && nextPage) request('comments', nextPage);
-        }, {root: dialog.querySelector('.media-dialog-body'), rootMargin:'0px 0px 100px 0px'});
-        commentObserver.observe(dialog.querySelector('.comments-footer'));
-      }
-    }
-    function cancelReplies() {
-      pending.delete('replies'); api.post('cancelPlatformExtras',{kind:'replies'});
-      replyRoot = null; replyItems = []; replyNext = null; replyError = '';
-      dialog.querySelector('.comment-thread')?.remove();
-      dialog.querySelectorAll('.comment-replies-button').forEach(n=>n.setAttribute('aria-expanded','false'));
-    }
-    function requestReplies(pageHandle = null) {
-      if (!replyRoot || pending.has('replies') || !hasCapability(commentTrack,'CommentReplies')) return;
-      const id = ++requestId;
-      pending.set('replies',{id,handle:commentTrack.handle,pageHandle,rootHandle:replyRoot.handle});
-      replyError = ''; renderReplies();
-      api.post('requestPlatformExtras',{kind:'replies',handle:commentTrack.handle,rootHandle:replyRoot.handle,requestId:id,pageHandle});
-    }
-    function receiveReplies(payload) {
-      const p = pending.get('replies');
-      if (!p || p.id !== payload.requestId || p.handle !== payload.handle || p.rootHandle !== replyRoot?.handle ||
-          !dialog.open || panelKind !== 'comments' || !hasCapability(commentTrack,'CommentReplies')) return;
-      pending.delete('replies');
-      if(payload.error) replyError = payload.error.message || t('评论暂不可用');
-      else {
-        const known = new Set(replyItems.map(c=>c.handle).filter(Boolean));
-        replyItems.push(...(payload.items||[]).slice(0,100).filter(c=>!c.handle || !known.has(c.handle)));
-        replyNext = payload.nextPageHandle !== p.pageHandle ? payload.nextPageHandle : null;
-      }
-      renderReplies();
-    }
-    function renderReplies() {
-      const thread = dialog.querySelector('.comment-thread');
-      if(!thread) return;
-      const list = thread.querySelector('.comment-thread-list');
-      const rendered = Number(list.dataset.count)||0;
-      for(const c of replyItems.slice(rendered)) {
-        const row = document.createElement('div'); row.className='comment-reply'; row.setAttribute('data-i18n-skip','');
-        const avatar = window.AuralisCreatorFeed.art(c.avatarUrl);
-        row.innerHTML=`<span class="comment-avatar" aria-hidden="true"><span>${esc(Array.from(c.author||'?')[0])}</span>${avatar ? `<img src="${esc(avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}</span><div class="comment-content"><strong>${esc(c.author)}</strong>${c.replyToAuthor ? `<small> ↪ ${esc(c.replyToAuthor)}</small>` : ''}<p>${commentText(c)}</p><div class="comment-meta">${window.AuralisCreatorFeed.date(c.publishedAt,esc)}<small>♡ ${Math.max(0,Number(c.likeCount)||0)}</small></div></div>`;
-        row.querySelector('.comment-avatar img')?.addEventListener('error',event=>event.target.remove(),{once:true});
-        for(const img of row.querySelectorAll('.comment-emote'))img.addEventListener('error',()=>img.replaceWith(document.createTextNode(img.alt)),{once:true});
-        list.append(row);
-      }
-      list.dataset.count=replyItems.length;
-      thread.querySelector('.thread-footer').innerHTML=pending.has('replies') ? `<p>${t('正在读取…')}</p>` : replyError ? `<p>${esc(replyError)}</p><button class="secondary-button" data-media-action="more-replies">${t('重试')}</button>` : replyNext ? `<button class="secondary-button" data-media-action="more-replies">${t('更多回复')}</button>` : `<p>${t('已加载当前可见的回复')}</p>`;
-    }
-    function commentText(comment) {
-      const text = String(comment.text || '');
-      if (api.reduced()) return esc(text);
-      const emotes = new Map((comment.emotes || []).slice(0,64)
-        .filter(e => typeof e.text === 'string' && e.text.length > 0 && e.text.length <= 100 && /^https:\/\/platform-art\.auralis\.local\/[a-z0-9-]+$/i.test(e.url))
-        .map(e => [e.text, e.url]));
-      if (!emotes.size) return esc(text);
-      const pattern = new RegExp([...emotes.keys()].sort((a,b) => b.length-a.length).map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'), 'g');
-      let html = '', cursor = 0, count = 0;
-      for (const match of text.matchAll(pattern)) {
-        if (++count > 100) break;
-        html += esc(text.slice(cursor, match.index)) + `<img class="comment-emote" src="${esc(emotes.get(match[0]))}" alt="${esc(match[0])}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`;
-        cursor = match.index + match[0].length;
-      }
-      return html + esc(text.slice(cursor));
     }
     function openComments(track, follow = false) {
       if (!canRequestExtras(track, 'comments')) return;
-      pending.delete('comments'); api.post('cancelPlatformExtras', {kind:'comments'});
-      cancelReplies();
-      commentObserver?.disconnect();
+      drawerDiscussion.close();
       panelKind = 'comments'; commentTrack = track; followsPlayback = follow;
-      comments = []; nextPage = null; commentsError = ''; failedPage = null; renderedComments = 0;
-      openDialog('评论', '<p role="status">正在读取…</p>');
-      dialog.querySelector('.media-dialog-body').scrollTop = 0;
-      request('comments');
+      openDialog(t('评论'), '');
+      drawerDiscussion.open(dialog.querySelector('.media-dialog-body'),track);
     }
     function save(track) {
       if (!track) return;
@@ -386,13 +298,17 @@ window.AuralisMediaHub = (() => {
         row.classList.toggle('current', current); button.setAttribute('aria-current', current ? 'true' : 'false');
       }
     }
-    function setVideo(enabled) {
+    function setVideo(enabled,qualityHandle=undefined) {
       const track = api.current();
       if ((track?.id || '') !== trackKey) sync();
       if (enabled && !canRequestVideo(track)) return;
-      if (enabled && (videoPending || videoEnabled)) return;
+      if (enabled && (videoPending || videoEnabled && qualityHandle===undefined)) return;
+      const switching=enabled&&videoEnabled;
+      automaticVideoQuality=!qualityHandle;
       videoPending = enabled; videoEnabled = false; videoRequest++;
-      stopPictures(enabled);
+      stopPictures(enabled&&!switching);
+      qualitySelect.disabled=enabled;
+      if(!enabled)qualityControl.hidden=true;
       $('[data-media-action="video-retry"]').hidden = true;
       if (enabled) {
         videoExit?.cancel(); videoExit = null;
@@ -400,14 +316,23 @@ window.AuralisMediaHub = (() => {
         $('#embeddedVideoPage').classList.add('is-loading');
       } else hideVideoPage();
       $('#embeddedVideoStatus').textContent = '正在加载视频，音频继续播放…';
-      api.post('setEmbeddedVideo', { handle: track?.handle, enabled, requestId: videoRequest });
+      api.post('setEmbeddedVideo', { handle: track?.handle, enabled, requestId: videoRequest, ...(qualityHandle?{qualityHandle}:{}) });
       sync(); videoBounds();
-      if (enabled) $('[data-media-action="audio"]').focus({preventScroll:true});
-      else if ($('#nowPlayingOverlay').classList.contains('open')) $('#largeCover').focus({preventScroll:true});
+      if (enabled&&!switching) $('[data-media-action="audio"]').focus({preventScroll:true});
+      else if (!enabled && $('#nowPlayingOverlay').classList.contains('open')) $('#largeCover').focus({preventScroll:true});
     }
     function receiveVideo(payload) {
       if (payload?.requestId !== videoRequest || payload.handle !== api.current()?.handle) return;
       videoPending = false; videoEnabled = payload.enabled === true;
+      qualitySelect.replaceChildren();
+      const automatic=document.createElement('option');automatic.value='';automatic.textContent=t('自动画质');qualitySelect.append(automatic);
+      const qualities=Array.isArray(payload.qualities)?payload.qualities.filter(q=>/^vq-[a-f0-9]{32}$/.test(q?.handle)&&typeof q.label==='string').slice(0,24):[];
+      for(const q of qualities){const option=document.createElement('option');option.value=q.handle;option.textContent=q.label;qualitySelect.append(option);}
+      const actual=qualities.find(q=>q.handle===payload.selectedQualityHandle);
+      if(actual)automatic.textContent=t('自动画质')+' · '+actual.label;
+      qualitySelect.value=automaticVideoQuality?'':payload.selectedQualityHandle||'';
+      qualityLabel.textContent=t('画质');qualitySelect.setAttribute('aria-label',t('画质'));
+      qualityControl.hidden=!qualities.length;qualitySelect.disabled=false;
       $('#embeddedVideoPage').classList.remove('is-loading');
       if (videoEnabled) $('#embeddedVideoPage').hidden = false;
       else if (!payload.error) hideVideoPage();
@@ -514,6 +439,7 @@ window.AuralisMediaHub = (() => {
       $('#mediaTools').append(group);
     }
     function sync() {
+      pageDiscussion.sync();
       creatorFeed.sync();
       creatorSearch.sync();
       pluginPages.sync();
@@ -527,6 +453,7 @@ window.AuralisMediaHub = (() => {
         if (dialog.open && panelKind !== 'comments') closeDialog(true);
         videoExit?.cancel(); videoExit = null;
         videoEnabled = videoPending = false; videoRequest++; hideVideoPage(true);
+        qualityControl.hidden=true;qualitySelect.replaceChildren();
         stopPictures(true);
         $('#embeddedVideoStatus').textContent = '';
         videoBounds();
@@ -537,17 +464,14 @@ window.AuralisMediaHub = (() => {
       }
       // Configuration can revoke a capability while the same track remains audible. Retire
       // only its extension requests/UI; an already active audio/video lease is not stopped.
-      for (const kind of ['comments', 'parts', 'danmaku']) {
-        if (!canRequestExtras(kind === 'comments' ? commentTrack : track, kind) && pending.delete(kind))
+      for (const kind of ['parts', 'danmaku']) {
+        if (!canRequestExtras(track, kind) && pending.delete(kind))
           api.post('cancelPlatformExtras', {kind});
       }
       const extrasAvailable = hasCapability(track, 'MediaExtras'), videoAvailable = canRequestVideo(track);
+      qualitySelect.disabled=videoPending||!videoAvailable;
       if (!extrasAvailable) { parts = []; danmaku = []; danmakuTrack = ''; clearDanmaku(); }
-      if (!canRequestExtras(commentTrack, 'comments')) {
-        comments = []; nextPage = null; failedPage = null; commentsError = '';
-        commentObserver?.disconnect(); commentObserver = null;
-      }
-      if (replyRoot && !hasCapability(commentTrack,'CommentReplies')) cancelReplies();
+      drawerDiscussion.sync();
       if (dialog.open && ((panelKind === 'comments' && !canRequestExtras(commentTrack, 'comments')) ||
           (panelKind === 'parts' && !extrasAvailable) ||
           (dialog.querySelector('#coverVideoOption') && !videoAvailable) ||
@@ -600,19 +524,6 @@ window.AuralisMediaHub = (() => {
       e.preventDefault(); e.stopImmediatePropagation();
       const action = button.dataset.mediaAction;
       if (action === 'creator' || action === 'track-creator') openCreator(action==='creator' ? api.current() : api.find(button.dataset.id));
-      if (action === 'sort-comments') {
-        if(commentSort !== button.dataset.sort) {commentSort=button.dataset.sort;openComments(commentTrack,followsPlayback);}
-      }
-      if (action === 'replies') {
-        const selected = comments[Number(button.dataset.index)], collapse = replyRoot?.handle === selected?.handle;
-        cancelReplies();
-        if(!collapse && selected?.handle && hasCapability(commentTrack,'CommentReplies')) {
-          replyRoot=selected;button.setAttribute('aria-expanded','true');
-          button.insertAdjacentHTML('afterend','<section class="comment-thread"><div class="comment-thread-list"></div><div class="thread-footer" role="status"></div></section>');
-          requestReplies();
-        }
-      }
-      if(action==='more-replies')requestReplies(replyNext);
       if (action === 'close') closeDialog();
       if (action === 'save-current') save(api.current());
       if (action === 'save') save(api.find(button.dataset.id));
@@ -633,12 +544,10 @@ window.AuralisMediaHub = (() => {
           return;
         }
         if (!canRequestExtras(api.current(), 'parts')) return;
-        panelKind = action === 'parts' ? 'parts' : 'comments';
-        commentTrack = action === 'track-comments' ? api.find(button.dataset.id) : api.current();
-        comments = []; nextPage = null; commentsError = ''; failedPage = null; openDialog(panelKind === 'parts' ? '分 P' : '评论', '<p role="status">正在读取…</p>'); request(panelKind);
+        panelKind = 'parts';
+        openDialog('分 P', '<p role="status">正在读取…</p>'); request(panelKind);
       }
-      if (action === 'retry-extras') { button.disabled = true; request(panelKind, failedPage); }
-      if (action === 'more-comments' && nextPage) { button.disabled = true; request('comments', nextPage); }
+      if (action === 'retry-extras') { button.disabled = true; request(panelKind); }
       if (action === 'part') { const item = parts[Number(button.dataset.index)]; if (item) { closeDialog(true); api.play(item, parts); } }
       if (action === 'audio') setVideo(false);
       if (action === 'video-retry') setVideo(true);

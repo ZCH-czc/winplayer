@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(\.\d+)?$')]
-    [string]$Version = '0.16.12',
+    [string]$Version = '0.16.13',
 
     [ValidateSet('win-x64')]
     [string]$Runtime = 'win-x64',

@@ -39,6 +39,8 @@ internal static class PluginPageQueryTests
         var projection=JsonSerializer.Serialize(query);
         Check(!projection.Contains("backend-"),"Query submit state and route remain backend-only");
         var before=RoutingProvider.QueryReads;
+        foreach(var size in new[]{-1,0,5,21,int.MaxValue})
+            Check(!(await coordinator.ReadPluginGlobalPageAsync("custom.public","query",null,"en-US",default,preferredPageSize:size)).IsSuccess,"Reject invalid viewport batch before plugin invocation");
         Check(!(await coordinator.ReadPluginGlobalPageAsync("custom.public","query",null,"en-US",default,values)).IsSuccess,"No implicit query on initial read");
         Check(!(await coordinator.ReadPluginGlobalPageAsync("custom.public","query",query.Submit.Handle,"en-US",default)).IsSuccess,"Explicit form submission required");
         Check(!(await coordinator.ReadPluginGlobalPageAsync("custom.public","hub",query.Submit.Handle,"en-US",default,values)).IsSuccess,"Cannot cross entries");

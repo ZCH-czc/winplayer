@@ -7,9 +7,9 @@ internal sealed partial class OnlinePlatformCoordinator
     private readonly CommentAvatarRegistry _commentAvatars = new();
 
     private string? RegisterCommentAvatar(string providerId, Uri? uri,
-        Auralis.Platform.Host.PlatformCommentArtworkPolicy policy, Func<bool> isActive)
+        Auralis.Platform.Host.PlatformCommentArtworkPolicy policy, Func<bool> isActive, bool fullImage = false)
     {
-        lock (_gate) return _commentAvatars.Register(providerId, uri, policy, isActive);
+        lock (_gate) return _commentAvatars.Register(providerId, uri, policy, isActive, fullImage);
     }
 
     internal PlatformTrack? GetBackendTrack(string handle)

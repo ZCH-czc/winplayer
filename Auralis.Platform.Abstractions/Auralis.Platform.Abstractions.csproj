@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Auralis.Platform.Abstractions</RootNamespace>
     <AssemblyName>Auralis.Platform.Abstractions</AssemblyName>
-<Version>1.11.0</Version>
+<Version>1.16.0</Version>
     <!-- Additive API 1 contracts retain the existing assembly identity. -->
     <AssemblyVersion>1.1.0.0</AssemblyVersion>
     <PackageId>Auralis.Platform.Abstractions</PackageId>

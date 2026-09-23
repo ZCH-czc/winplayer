@@ -1767,6 +1767,8 @@ svg { stroke-width: 1.55; }
   background: var(--sidebar);
   border-right: 1px solid var(--stroke);
   backdrop-filter: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 .navigation { gap: 2px; }
 .nav-section-label { margin: 18px 11px 6px; font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; }
@@ -3579,7 +3581,7 @@ body.is-playing .now-playing-overlay.open[data-player-style="record"] .vinyl-dis
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border: 1px solid var(--stroke);
+  border: 1px solid transparent;
   border-radius: 10px;
   background: color-mix(in srgb, var(--surface-solid) 76%, transparent);
 }
@@ -3603,7 +3605,12 @@ body.is-playing .now-playing-overlay.open[data-player-style="record"] .vinyl-dis
   align-items: center;
   justify-content: center;
   gap: 6px;
+  border-color:transparent;
+  background:transparent;
+  position:relative;
 }
+.platform-search-page-actions .secondary-button:hover:not(:disabled) { background:var(--accent-soft); color:var(--accent); }
+@media(forced-colors:active) { .platform-search-page-actions .secondary-button { border-color:ButtonText; } }
 
 .platform-search-page-actions svg {
   width: 15px;
@@ -3622,11 +3629,12 @@ body.is-playing .now-playing-overlay.open[data-player-style="record"] .vinyl-dis
 
 .platform-search-page-actions .is-loading svg,
 .platform-search-page-actions .is-loading > span:not(.platform-page-button-spinner) {
-  display: none;
+  visibility: hidden;
 }
 
 .platform-search-page-actions .is-loading .platform-page-button-spinner {
   display: block;
+  position:absolute;
 }
 
 .platform-page-error {
@@ -4450,7 +4458,7 @@ body.is-playing .now-playing-overlay.open[data-player-style="record"] .vinyl-dis
   .nav-item > span:not(.nav-icon),
   .nav-count,
   .nav-section-label { display: none; }
-  .settings-link { margin-top: auto; }
+  .settings-link { margin-top: 12px; }
   .page-content { padding-inline: 12px; }
   .settings-page { width: 100%; }
   .player-bar { grid-template-columns: minmax(118px, 1fr) auto 92px; gap: 6px; padding-inline: 8px; }

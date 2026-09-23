@@ -125,6 +125,7 @@
       ? 'blue'
       : (localStorage.getItem('auralis:accent') || 'blue'),
     density: localStorage.getItem('auralis:density') || 'comfortable',
+    searchResultPriority: readEnumPreference('auralis:search-result-priority', ['local', 'plugin'], 'local'),
     motion: motionOptions.some(([value]) => value === storedMotionPreference) ? storedMotionPreference : 'system',
     playerStyle: readEnumPreference('auralis:player-style', ['immersive', 'record'], 'immersive'),
     windowEffect: localStorage.getItem('auralis:window-effect') || 'none',
@@ -229,6 +230,7 @@
     maximized: false,
     scanning: false,
     platformSearch: {
+      category: 'all',
       providerId: localStorage.getItem('auralis:platform-search-provider') || '',
       requestId: 0,
       pendingRequestId: 0,
@@ -453,13 +455,15 @@
       providerId: owner,
       title: String(item.title || '未知歌曲'),
       artist: platformArtistText(item),
+      artistNames: Array.isArray(item.artistNames) ? item.artistNames.filter(name => typeof name === 'string' && name.trim()).slice(0, 12) : [],
       album: platformAlbumText(item),
       coverUrl: safePlatformImageUrl(item.coverUrl || item.artworkUrl),
       durationSeconds: platformDurationSeconds(item),
       availability,
       previewOnly: availability.includes('preview'),
       unavailable: availability.includes('unavailable') || item.playable === false || item.isPlayable === false,
-      hasMusicVideo: item.hasMusicVideo === true
+      hasMusicVideo: item.hasMusicVideo === true,
+      viewCount: Number.isSafeInteger(item.viewCount) && item.viewCount >= 0 ? item.viewCount : null
     };
   }
 
@@ -1094,6 +1098,7 @@
     if (search.pending || pageIndex < 0) return;
     const cached = search.pages[pageIndex];
     if (cached) {
+      const direction=pageIndex<search.pageIndex?-1:1;
       search.pageIndex = pageIndex;
       search.items = cached.items;
       search.nextPageHandle = cached.nextPageHandle;
@@ -1102,7 +1107,7 @@
       search.errorCode = '';
       search.retryAvailableAt = 0;
       renderSearch();
-      pageContent.querySelector('.platform-search-section')?.scrollIntoView({ block: 'start', behavior: isMotionReduced() ? 'auto' : 'smooth' });
+      presentSearchPage(direction);
       return;
     }
 
@@ -1123,6 +1128,18 @@
       pageSize: search.pageSize,
       pageHandle: previous.nextPageHandle
     });
+  }
+
+  function presentSearchPage(direction) {
+    if(state.platformSearch.category==='users')return;
+    const results=document.getElementById('platformTrackResults');
+    if(!results)return;
+    if(document.activeElement?.closest('.platform-search-pagination')){
+      const target=results.querySelector('.track-row[tabindex="0"]')||results;
+      if(target===results)target.tabIndex=-1;target.focus({preventScroll:true});
+    }
+    results.scrollIntoView({block:'start',behavior:isMotionReduced()?'auto':'smooth'});
+    window.AuralisPageMotion?.enter(results,isMotionReduced(),direction);
   }
 
   function setPage(page, options = {}) {
@@ -1292,17 +1309,23 @@
   }
 
   function platformTrackList(tracks, startIndex = 0) {
+    const hasViews = tracks.some(track => track.viewCount != null);
     return `<div class="list-surface platform-list-surface">
-      <div class="track-list-header platform-track-grid"><span>#</span><span>标题</span><span>艺术家</span><span>专辑</span><span>时长</span><span>来源</span><span aria-label="操作"></span></div>
-      <div class="track-list">${tracks.map((track, index) => platformTrackRow(track, startIndex + index)).join('')}</div>
+      <div class="track-list-header platform-track-grid"><span>#</span><span>标题</span><span>艺术家</span><span>专辑</span><span>时长</span><span>${hasViews ? '播放量' : '来源'}</span><span aria-label="操作"></span></div>
+      <div class="track-list">${tracks.map((track, index) => platformTrackRow(track, startIndex + index, hasViews)).join('')}</div>
     </div>`;
   }
 
-  function platformTrackRow(track, index) {
+  function platformTrackRow(track, index, hasViews = false) {
     const pending = state.platformPlayback.pendingHandle === track.handle;
     const videoPending = state.platformVideo.pendingHandle === track.handle;
     const sourceName = platformDisplayName(track.providerId);
     const availability = track.unavailable ? '不可播放' : track.previewOnly ? '试听' : sourceName;
+    const names = Array.isArray(track.artistNames) && track.artistNames.length ? track.artistNames : [track.artist];
+    const creatorAvailable = hasCreatorPage(track) || currentPlatformCapabilities(track).includes('CreatorFeed') || currentPlatformCapabilities(track).includes('CreatorProfile');
+    const artistMarkup = names.map((name, position) => position === 0 && creatorAvailable
+      ? `<button class="creator-link" data-media-action="track-creator" data-id="${escapeHtml(track.handle)}" aria-label="${t('作者主页')} · ${escapeHtml(name)}" data-i18n-skip>${escapeHtml(name)}</button>`
+      : `<span class="creator-coauthor">${escapeHtml(name)}</span>`).join('<span class="creator-separator" aria-hidden="true">、</span>');
     const trackHint = pending ? t('正在准备音频…') : track.previewOnly
       ? '仅提供试听片段'
       : '在线结果 · 不会加入本地曲库';
@@ -1316,10 +1339,10 @@
       : '<span class="platform-mv-placeholder" aria-hidden="true">—</span>';
     return `<div class="track-row platform-track-row platform-track-grid ${pending ? 'is-loading' : ''} ${track.unavailable ? 'is-unavailable' : ''}" data-track-id="${escapeHtml(track.id)}" data-platform-play-row="${escapeHtml(track.handle)}" tabindex="${track.unavailable ? '-1' : '0'}" role="button" aria-label="${pending ? t('正在准备音频…') : t('播放')} ${escapeHtml(track.title)}" aria-busy="${pending}" aria-disabled="${track.unavailable ? 'true' : 'false'}">
       <div class="track-index-cell"><span class="track-number">${String(index + 1).padStart(2, '0')}</span><button class="row-play" data-platform-play-handle="${escapeHtml(track.handle)}" aria-label="播放 ${escapeHtml(track.title)}" ${track.unavailable || pending ? 'disabled' : ''}><span class="row-play-icon">${icon('play')}</span><span class="row-pause-icon">${icon('pause')}</span><span class="platform-row-spinner"></span></button></div>
-      <div class="track-title-cell"><div class="row-cover" style="${coverStyle(track)}">${track.coverUrl ? '' : escapeHtml(track.title.charAt(0).toUpperCase())}</div><div class="title-stack"><strong>${escapeHtml(track.title)}</strong><span>${trackHint}</span></div></div>
-      <span class="track-cell">${(hasCreatorPage(track) || capabilities.includes('CreatorFeed') || capabilities.includes('CreatorProfile')) ? `<button class="creator-link" data-media-action="track-creator" data-id="${escapeHtml(track.handle)}" title="${t('作者主页')}" data-i18n-skip>${escapeHtml(track.artist)}</button>` : escapeHtml(track.artist)}</span><span class="track-cell">${escapeHtml(track.album)}</span>
+      <div class="track-title-cell"><div class="row-cover" style="${coverStyle(track)}">${track.coverUrl ? '' : escapeHtml(track.title.charAt(0).toUpperCase())}</div><div class="title-stack"><strong class="platform-full-title" tabindex="0" data-full-title="${escapeHtml(track.title)}" aria-label="${escapeHtml(track.title)}">${escapeHtml(track.title)}</strong><span>${trackHint}</span></div></div>
+      <span class="track-cell creator-names">${artistMarkup}</span><span class="track-cell">${escapeHtml(track.album)}</span>
       <span class="duration-cell">${formatTime(track.durationSeconds)}</span>
-      <span class="provider-badge provider-${escapeHtml(track.providerId)} ${track.unavailable ? 'unavailable' : ''}">${escapeHtml(availability)}</span>
+      <span class="${hasViews ? 'platform-view-count' : 'provider-badge provider-'+escapeHtml(track.providerId)+(track.unavailable ? ' unavailable' : '')}" ${hasViews ? `aria-label="播放量 ${escapeHtml(String(track.viewCount ?? '未知'))}"` : ''}>${hasViews ? track.viewCount == null ? '—' : escapeHtml(new Intl.NumberFormat(document.documentElement.lang || 'zh-CN', {notation:'compact',maximumFractionDigits:1}).format(track.viewCount)) : escapeHtml(availability)}</span>
       <span class="platform-mv-cell"><button class="row-action" data-media-action="save" data-id="${escapeHtml(track.handle)}" aria-label="加入歌单" title="加入歌单">${icon('plus')}</button>${creatorAction}${commentsAction}${videoAction}</span>
     </div>`;
   }
@@ -1389,7 +1412,10 @@
     const resultSummary = search.items.length
       ? `${Number.isFinite(search.totalCount) ? search.totalCount : search.items.length} 首${mvCount ? ` · 本页 ${mvCount} 个视频` : ''}`
       : '仅搜索与取流';
-    return `<section class="search-section platform-search-section"><div class="section-title-row"><h2>在线歌曲</h2><span>${resultSummary}</span>${platformProviderSelectMarkup()}</div>${body}</section>`;
+    const creators = currentPlatformCapabilities({kind:'online',providerId:search.providerId}).includes('CreatorSearch');
+    if (!creators) search.category = 'all';
+    const categories = creators ? `<nav class="search-result-categories" aria-label="${escapeHtml(t('搜索分类'))}">${[['all','综合'],['tracks','音视频'],['users','用户']].map(([value,label])=>`<button type="button" class="secondary-button" data-action="search-result-category" data-category="${value}" aria-pressed="${search.category===value}">${escapeHtml(t(label))}</button>`).join('')}</nav>` : '';
+    return `<section class="search-section platform-search-section"><div class="section-title-row"><h2>${escapeHtml(sourceName)}</h2><span>${resultSummary}</span>${platformProviderSelectMarkup()}</div>${categories}<section id="creatorSearchSection" class="search-section" hidden></section><div id="platformTrackResults" ${search.category==='users'?'hidden':''}>${body}</div></section>`;
   }
 
   const onlinePlaylistProviders = [];
@@ -1527,6 +1553,13 @@
   }
 
   function renderSearch() {
+    const identity=JSON.stringify([state.query,state.platformSearch.providerId,document.documentElement.lang]);
+    const prior=pageContent.querySelector('.search-view');
+    const retainedCreator=prior?.dataset.searchIdentity===identity?prior.querySelector('#creatorSearchSection'):null;
+    const position=pageContent.scrollTop,focused=document.activeElement;
+    const retainedFocus=retainedCreator?.contains(focused)?focused:null;
+    const pagingFocus=prior?.dataset.searchIdentity===identity&&focused?.closest('.platform-search-pagination')?
+      focused.dataset.action||focused.closest('.platform-search-pagination').dataset.focusAction:null;
     const totalAlbums = new Set(state.tracks.map(track => track.album)).size;
     const totalArtists = new Set(state.tracks.map(track => track.artist)).size;
     if (!state.query) {
@@ -1535,7 +1568,7 @@
         ${searchHistoryMarkup()}
         <section class="search-welcome">
           <div class="search-welcome-icon">${icon('search')}</div>
-          <h2>从本地开始，需要时连接在线来源</h2>
+          <h2>${state.searchResultPriority==='plugin'&&Object.keys(platformProviders).length?'优先查看在线内容，也可随时浏览本地音乐':'从本地开始，需要时连接在线来源'}</h2>
           <p>输入歌曲名、艺术家、专辑或文件名。本地结果不会离开设备；已配置的在线来源会收到你的搜索关键词。</p>
           <div class="search-library-stats"><span><strong>${state.tracks.length}</strong> 首本地歌曲</span><i></i><span><strong>${totalAlbums}</strong> 张专辑</span><i></i><span><strong>${totalArtists}</strong> 位艺术家</span></div>
           ${state.tracks.length ? '' : `<button class="accent-button" data-action="pick-folder">${icon('folder')} 添加本地音乐文件夹</button>`}
@@ -1552,16 +1585,32 @@
     const artists = artistNames.map(artist => [artist, state.tracks.filter(track => (track.artist || '未知艺术家') === artist)]);
     const localBody = matchedTracks.length
       ? trackList(matchedTracks)
-      : '<div class="platform-inline-state local-search-empty"><strong>本机音乐库中没有匹配歌曲</strong><span>在线结果会单独显示在下方，不会被加入本地曲库。</span></div>';
+      : '<div class="platform-inline-state local-search-empty"><strong>本机音乐库中没有匹配歌曲</strong><span>插件结果单独显示，不会被加入本地曲库。</span></div>';
     pageContent.innerHTML = `<div class="page-view search-view">
       <header class="page-header search-page-header"><div><h1>“${escapeHtml(state.query)}”</h1><p>本机 ${matchedTracks.length} 首 · 在线结果与本地库保持分离</p></div><div class="page-actions">${matchedTracks.length ? `<button class="accent-button" data-action="play-all" data-first-id="${matchedTracks[0].id}">${icon('play')} 播放本地结果</button>` : ''}</div></header>
       <section class="search-section"><div class="section-title-row"><h2>本机歌曲</h2><span>${matchedTracks.length} 首</span></div>${localBody}</section>
       ${platformSearchSectionMarkup()}
-      <section id="creatorSearchSection" class="search-section" hidden></section>
       ${albums.length ? `<section class="search-section"><div class="section-title-row"><h2>本机专辑</h2><span>${localizedCount('album', albums.length)}</span></div><div class="search-card-grid">${albums.slice(0, 6).map(([album, tracks]) => `<article class="media-card" data-play-id="${tracks[0].id}" tabindex="0" role="button" aria-label="播放专辑 ${escapeHtml(album)}"><div class="media-card-cover" style="${coverStyle(tracks[0])}">${tracks[0].coverUrl ? '' : `<span class="cover-letter">${escapeHtml(album.charAt(0).toUpperCase())}</span>`}<button class="card-play" aria-label="播放专辑 ${escapeHtml(album)}">${icon('play')}</button></div><strong>${escapeHtml(album)}</strong><span>${localizedCount('song', tracks.length)}</span></article>`).join('')}</div></section>` : ''}
       ${artists.length ? `<section class="search-section"><div class="section-title-row"><h2>本机艺术家</h2><span>${artists.length} 位</span></div><div class="search-artist-grid">${artists.slice(0, 8).map(([artist, tracks]) => `<article class="search-artist-result" data-play-id="${tracks[0].id}" tabindex="0" role="button" aria-label="播放艺术家 ${escapeHtml(artist)}">${artistAvatarMarkup(artist, tracks, true)}<div><strong>${escapeHtml(artist)}</strong><span>${tracks.length} 首匹配歌曲</span></div>${icon('play')}</article>`).join('')}</div></section>` : ''}
     </div>`;
+    const searchView=pageContent.querySelector('.search-view');
+    searchView.dataset.searchIdentity=identity;
+    // Semantic DOM order keeps keyboard navigation aligned with the visual preference.
+    const pluginResults=searchView.querySelector('.platform-search-section');
+    if(pluginResults){
+      if(state.searchResultPriority==='plugin')searchView.querySelector('.search-page-header').after(pluginResults);
+      else searchView.append(pluginResults);
+    }
+    if(retainedCreator)pageContent.querySelector('#creatorSearchSection')?.replaceWith(retainedCreator);
     mediaHub?.renderCreatorSearch();
+    if(prior?.dataset.searchIdentity===identity){
+      pageContent.scrollTop=position;
+      if(retainedFocus?.isConnected)retainedFocus.focus({preventScroll:true});
+      if(pagingFocus){
+        const button=pageContent.querySelector(`[data-action="${pagingFocus}"]`),nav=button?.closest('nav');
+        if(nav){nav.tabIndex=-1;nav.dataset.focusAction=pagingFocus;(button.disabled?nav:button).focus({preventScroll:true});}
+      }
+    }
   }
 
   function mediaCard(track) {
@@ -2266,6 +2315,7 @@
 
         <section class="settings-card music-folders-card" data-settings-group="library"><div class="settings-card-header"><div><h2>本地音乐库</h2><p>同时监听多个文件夹；在线搜索结果永远不会写入这里</p></div><div class="settings-card-header-actions"><button class="secondary-button" data-action="rescan-music-folders" ${state.musicFolders.length ? '' : 'disabled'}>全部重扫</button><button class="accent-button" data-action="pick-folder">${icon('plus')} 添加文件夹</button></div></div>
           ${musicFoldersMarkup()}
+          <div class="setting-row"><div class="setting-label"><strong>搜索偏好</strong><span>优先展示本地或在线结果；不改变搜索范围或播放队列</span></div><div class="segmented" data-setting="searchResultPriority"><button data-value="local">本地优先</button><button data-value="plugin">在线优先</button></div></div>
           <div class="music-folder-note">停止监听不会删除已经导入的歌曲，也不会移动或修改磁盘上的任何文件。</div>
           <div class="setting-row"><div class="setting-label"><strong>艺术家封面高斯模糊</strong><span>柔化从歌曲封面自动生成的艺术家封面；自定义头像保持清晰</span></div><button class="switch" data-toggle="artistCoverBlur" role="switch" aria-label="艺术家封面高斯模糊"></button></div>
           <div class="setting-row"><div class="setting-label"><strong>显示艺术家首字</strong><span>在艺术家封面或自定义头像上叠加艺术家首字</span></div><button class="switch" data-toggle="showArtistInitial" role="switch"></button></div>
@@ -2279,6 +2329,7 @@
   }
 
   function syncSettingsControls() {
+    $$('[data-setting="searchResultPriority"] button').forEach(button => button.classList.toggle('active', button.dataset.value === state.searchResultPriority));
     syncFullscreenThemeSelector();
     if (state.currentPage !== 'settings') return;
     $$('[data-setting="playerStyle"] button').forEach(button => button.classList.toggle('active', button.dataset.value === state.playerStyle));
@@ -3508,6 +3559,18 @@
       showToast('已应用立体声与 1500 ms 稳定缓冲，下一首歌完整生效');
     }
     if (target.dataset.action === 'retry-platform-search') schedulePlatformSearch();
+    if (target.dataset.action === 'search-result-category' && ['all','tracks','users'].includes(target.dataset.category)) {
+      const changed=state.platformSearch.category!==target.dataset.category;
+      state.platformSearch.category = target.dataset.category;
+      document.querySelectorAll('[data-action="search-result-category"]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.category===state.platformSearch.category)));
+      const results=document.getElementById('platformTrackResults');
+      if(results)results.hidden=state.platformSearch.category==='users';
+      mediaHub?.renderCreatorSearch();
+      if(changed){
+        const reduced=document.documentElement.dataset.motion==='reduced'||(document.documentElement.dataset.motion!=='full'&&matchMedia('(prefers-reduced-motion:reduce)').matches);
+        window.AuralisPageMotion?.fade(document.querySelector('.platform-search-section'),reduced);
+      }
+    }
     if (target.dataset.action === 'platform-search-previous') showPlatformSearchPage(state.platformSearch.pageIndex - 1);
     if (target.dataset.action === 'platform-search-next') showPlatformSearchPage(state.platformSearch.pageIndex + 1);
 
@@ -3606,6 +3669,11 @@
       state.lyricsPreference = target.dataset.value;
       localStorage.setItem('auralis:lyrics-preference', state.lyricsPreference);
       refreshCurrentLyrics();
+      syncSettingsControls();
+    }
+    if (target.closest('[data-setting="searchResultPriority"]') && ['local','plugin'].includes(target.dataset.value)) {
+      state.searchResultPriority=target.dataset.value;
+      localStorage.setItem('auralis:search-result-priority',state.searchResultPriority);
       syncSettingsControls();
     }
     if (target.closest('[data-desktop-setting="fontWeight"]')) {
@@ -4318,6 +4386,7 @@
       if (payload.providerId && String(payload.providerId).toLowerCase() !== state.platformSearch.providerId) return;
       if (String(payload.pageHandle || '') !== state.platformSearch.pendingPageHandle) return;
       const requestedPageIndex = state.platformSearch.pendingPageIndex;
+      const previousPageIndex = state.platformSearch.pageIndex;
       state.platformSearch.pending = false;
       state.platformSearch.pendingRequestId = 0;
       state.platformSearch.pendingPageHandle = '';
@@ -4349,6 +4418,9 @@
         state.platformSearch.totalCount = null;
       }
       renderCurrentOnlineCollection();
+      if(!state.platformSearch.error&&requestedPageIndex!==previousPageIndex&&state.currentPage==='search'){
+        presentSearchPage(requestedPageIndex<previousPageIndex?-1:1);
+      }
       schedulePlatformSearchRetryAvailability();
     },
     setPlatformPlaybackResult(payload) {

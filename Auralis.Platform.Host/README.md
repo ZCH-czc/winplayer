@@ -1,5 +1,22 @@
 # Auralis.Platform.Host
 
+Development SDK 2.15.0 advertises `public-metrics.v1` for optional read-only view, like and repost counts.
+SDK 2.14.0 advertises `video-lease.v3` and `page-batch.v1`. Native validates 6–20 item
+viewport hints and projects current-video quality choices into session-bound opaque handles.
+Platform representation IDs, stream URLs and headers never enter WebView. Discovery remains inert,
+and existing plugins do not need to implement either optional addition.
+
+
+Development SDK 2.13.0 gates Pages v9 identity filters and bounded visible-page update declarations.
+Native projects opaque navigation and keyed revision fingerprints; provider state never enters WebView.
+The host owns visibility, cancellation and explicit update acceptance. Discovery remains metadata-only.
+Older Pages remain supported. See [page contract](../docs/PLUGIN_PAGES.md) for constraints and tests.
+
+Development SDK 2.12.0 gates Pages v8 declarations and validates bounded rich text and single-level quotations.
+Native projects approved artwork and separate read-only author/discussion handles; no executable markup.
+SDK 2.11.0 introduced Pages v7 feed/detail. Both retain earlier versions and stable assembly identity.
+See [page contract](../docs/PLUGIN_PAGES.md) for budgets, compatibility and acceptance limits.
+
 Development SDK 2.10.0 validates Pages v6 media schemas, mandatory feature declarations and SDK floor before activation.
 The Native coordinator projects revision-bound media handles, enforces provider/artwork boundaries and reuses stream resolution.
 Browsing never prepares audio. No platform branches or executable page actions are introduced; old Pages remain supported.

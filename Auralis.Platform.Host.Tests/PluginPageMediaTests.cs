@@ -32,9 +32,10 @@ internal static class PluginPageMediaTests
             media with { Artists = [new(new("foreign","author"),"Bad")] },
             media with { Album = new(new("foreign","album"),"Bad") },
             media with { MusicVideo = new(new("foreign","video"),"Bad") },
-            media with { ArtworkUrl = new("file:///private") }, media with { ArtworkUrl = new("https://user:pass@example.test/") }
+            media with { ArtworkUrl = new("file:///private") }, media with { ArtworkUrl = new("https://user:pass@example.test/") },
+            media with { ViewCount = -1 }
         }) Check(!PlatformPageValidation.IsValid(doc with { Cards = [new() { Id = "bad", Media = invalid }] }),"Invalid media denied");
-        Task<PlatformResult<OnlinePageView>> Read() => coordinator.ReadPluginGlobalPageAsync("custom.public","query",null,"en-US",default);
+        Task<PlatformResult<OnlinePageView>> Read() => coordinator.ReadPluginGlobalPageAsync("custom.public","query",null,"en-US",default,forceRefresh:true);
         try
         {
             var before = Get<int>("MediaLeaseCalls");
@@ -74,6 +75,50 @@ internal static class PluginPageMediaTests
             Get<TaskCompletionSource<bool>>("MediaLeaseGate").SetResult(true);
             Check(!(await late).IsSuccess,"Late lease cannot escape revoked page revision");
             Check(!context.IsCurrent() && coordinator.GetBackendTrack(view.Handle) is null,"Revision revokes playback and prefetch handle");
+            var reading = new PlatformPageDocument { Version=7,Title="Reading",Layout="feed",Cards=[new() {
+                Id="backend-post",Title="Post",Open=new("Read","about","backend-state") }] };
+            Set("TargetDocument",reading);
+            var projected=await Read();
+            Check(projected.IsSuccess && projected.Value.Version==7 && projected.Value.Cards[0].Open?.Handle.StartsWith("page-")==true,"V7 projects primary read as opaque navigation");
+            Check(!JsonSerializer.Serialize(projected.Value).Contains("backend-"),"V7 state/identity stay native");
+            Set("TargetDocument",reading with {Cards=[reading.Cards[0] with {Open=new("Foreign","about") {
+                Target=new("feed",new("foreign","creator"),"creator") }}]});
+            Check((await Read()).Error?.Code==PlatformErrorCode.InvalidResponse,"V7 primary target rejects foreign provider");
+            var photo=new Uri("https://art.example.test/photo.png");
+            var quoted=new PlatformPageQuote {Author="Original",Text="Quoted",Body=[new("Quoted",new("https://unapproved.test/image"))],Images=[photo],
+                Discussion=new("custom.public","backend-original"),AuthorAction=new("Author","creator","backend-state") {
+                    Target=new("feed",new("custom.public","backend-author"),"creator") }};
+            var rich=reading with {Version=8,Cards=[reading.Cards[0] with {Text="[smile]",Body=[new("[smile]",new("https://art.example.test/e.png"))],
+                Avatar=photo,Image=photo,Images=[photo],Quote=quoted,Discussion=new("custom.public","backend-own")}]};
+            Set("TargetDocument",rich);var richView=await Read();
+            Check(richView.IsSuccess&&richView.Value.Version==8,"V8 Native projection succeeds");
+            var richCard=richView.Value.Cards[0];
+            Check(richCard.Body[0].Image?.StartsWith("https://platform-art.auralis.local/")==true&&richCard.Quote!.Body[0].Image is null,"Inline artwork obeys policy and opaque proxy");
+            Check(richCard.Avatar?.StartsWith("https://platform-art.auralis.local/avatar-")==true &&
+                richCard.Image?.StartsWith("https://platform-art.auralis.local/image-")==true && richCard.Images.Single()==richCard.Image &&
+                richCard.Quote!.Images.Single()==richCard.Image,"Native separates avatar and full-image grants even for the same source URI");
+            Check(coordinator.TryGetArtworkUri(new Uri(richCard.Images.Single()).AbsolutePath.TrimStart('/'), out var resolvedPhoto, out var photoAllowed) &&
+                resolvedPhoto==photo && photoAllowed!(photo),"Projected reading photo resolves under the declared provider policy");
+            Check(richCard.Quote!.DiscussionHandle!=richCard.DiscussionHandle&&richCard.Quote.AuthorAction!.Handle.StartsWith("page-"),"Quote has separate opaque subject and navigation");
+            Check(!JsonSerializer.Serialize(richView.Value).Contains("backend-")&&!JsonSerializer.Serialize(richView.Value).Contains("art.example.test"),"No backend identity, state or artwork origin reaches Web");
+            Set("TargetDocument",rich with {Cards=[rich.Cards[0] with {Quote=quoted with {Discussion=new("foreign","subject")}}]});
+            Check((await Read()).Error?.Code==PlatformErrorCode.InvalidResponse,"Quote cannot cross comment providers");
+            Set("TargetDocument",rich with {Cards=[rich.Cards[0] with {AuthorAction=new("Author","creator") {Target=new("feed",new("foreign","author"),"creator")}}]});
+            Check((await Read()).Error?.Code==PlatformErrorCode.InvalidResponse,"Attributed author cannot cross providers");
+            var live=reading with {Version=9,Navigation=[new(new("All","about","backend-filter"),new("https://art.example.test/portrait"),true)],
+                Updates=new(new("Check","about","backend-check"),new("Reload","about","backend-reload"),"backend-revision")};
+            Set("TargetDocument",live);var liveView=(await Read()).Value;
+            Check(liveView.Navigation[0].Image!.StartsWith("https://platform-art.auralis.local/")&&liveView.Navigation[0].Selected,"V9 authorized portrait and selection");
+            Check(liveView.Updates!.Fingerprint.Length==64&&!JsonSerializer.Serialize(liveView).Contains("backend-"),"V9 revision/state stay native");
+            Check((await Read()).Value.Updates!.Fingerprint==liveView.Updates.Fingerprint,"Same revision has stable session fingerprint");
+            Set("TargetDocument",live with {Updates=live.Updates! with {Revision="backend-changed"}});
+            Check((await Read()).Value.Updates!.Fingerprint!=liveView.Updates.Fingerprint,"Changed revision projects different fingerprint");
+            Set("TargetDocument",live with {Navigation=[live.Navigation[0] with {Image=new("https://unapproved.test/avatar")}]});
+            Check((await Read()).Value.Navigation[0].Image is null,"Rail follows declared artwork domains");
+            Set("TargetDocument",live with {Next=new("Next","about","backend-next")});
+            var appendHandle=(await Read()).Value.Next!.Handle;
+            Check((await coordinator.ReadPluginGlobalPageAsync("custom.public","query",appendHandle,"en-US",default)).Error?.Code==PlatformErrorCode.InvalidResponse,"Appended batches cannot replace rail or start a new poll");
+            Set("TargetDocument",doc);
             Check(!(await coordinator.AcquireStreamAsync(view.Handle,default)).IsSuccess,"Old media cannot replay");
             Check((await Read()).Value.Cards.Single().Media!.Handle != view.Handle,"Fresh revision gets a fresh media handle");
         }

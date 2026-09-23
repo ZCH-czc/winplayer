@@ -53,7 +53,7 @@ internal sealed partial class OnlinePlatformCoordinator
             var items = result.Value.Items.Select(p => new OnlineCreatorPostView(_community.Add("post", p.Id, handle, isActive: creator.IsActive),
                 p.DiscussionId is { } subject ? _community.Add("discussion", subject, handle, isActive: creator.IsActive) : null,
                 p.Title, p.Text, p.PublishedAt, p.CommentCount,
-                p.Images.Take(9).Select(u => RegisterCommentAvatar(creator.Entity.ProviderId, u, auth.Policy, auth.IsActive)).Where(u => u is not null).Cast<string>().ToArray())).ToArray();
+                p.Images.Take(9).Select(u => RegisterCommentAvatar(creator.Entity.ProviderId, u, auth.Policy, auth.IsActive, fullImage: true)).Where(u => u is not null).Cast<string>().ToArray())).ToArray();
             return PlatformResult<OnlineCreatorPostPage>.Success(new(items, NextCommunityPage("feed-page", creator.Entity, handle, result.Value.NextCursor, page?.Cursor, creator.IsActive)));
         }
     }

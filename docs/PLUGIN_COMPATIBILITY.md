@@ -1,6 +1,24 @@
 # 插件与 Host SDK 兼容性（schema 5）
 
-当前开发 SDK **2.10.0 / Abstractions 1.11.0**：Pages v6 增加归一化作品卡片。
+当前开发 SDK **2.15.0 / Abstractions 1.16.0**：新增 `public-metrics.v1` 的可选只读播放量、点赞量和转发量；
+使用这些新字段的插件必须声明最低 SDK 2.15.0。之前的 SDK 2.14.0 新增 `video-lease.v3` 可用画质与显式选择，
+以及 `page-batch.v1` 视口批量提示。旧插件保持自动画质；新能力插件必须声明最低 SDK 2.14.0。
+Pages v9 的通用头像筛选栏和可见页更新提示保持不变。
+入口要求 documentVersion:9、presentation:page、最低 SDK 2.13 与 v1 至 v9 features。
+更新检查是有界只读操作，不是后台订阅、账号写操作或发现阶段联网；旧 v1–v8 文档继续兼容。
+API 1、schema 5、程序集身份保持。新契约需要配套宿主，不能只改清单导入旧版本。
+
+历史开发 SDK **2.12.0 / Abstractions 1.13.0**：Pages v8 新增有界正文片段、作者导航与非递归引用。
+入口声明 documentVersion:8、presentation:page、最低 SDK 2.12 和 v1 至 v8 features。
+低版本、缺失特性或少报最低版本均在发现阶段拒绝；不执行 DLL 来猜测兼容性。
+API 1、schema 5、程序集身份保持；v1–v7 继续兼容。发布/安装状态与开发版本分开，详见 PLUGIN_PAGES.md。
+
+历史开发 SDK **2.11.0 / Abstractions 1.12.0**：Pages v7 增加明确的 `feed/detail` 阅读布局、
+卡片主阅读入口 `Open` 以及详情内讨论区。v7 入口必须是主页面，并声明 SDK 2.11 与 v1 至 v7 feature；
+旧宿主在加载 DLL 前拒绝新契约。API/schema/程序集身份不变，旧 v1–v6 页面继续可用。
+这是通用阅读原型，现有私人插件尚未接入、已安装播放器和发布包未替换。详见 PLUGIN_PAGES.md。
+
+历史开发 SDK **2.10.0 / Abstractions 1.11.0**：Pages v6 增加归一化作品卡片。
 documentVersion:6 必须声明 SDK 2.10 与 declarative-pages.v1 至 v6；旧 SDK 2.9 加载前拒绝。
 平台需声明 StreamResolution，页面 action 仍只读；API/schema/程序集身份保持。
 Bilibili 开发插件 1.18.0、QQ 1.16.0 采用 v6，均要求 SDK 2.10；网关 1.12.0 不变。
@@ -72,7 +90,7 @@ Abstractions 包保持 1.2.0、API 1、程序集身份 1.1.0.0。Host 包版本�
 | --- | --- |
 | `schemaVersion` | 宿主能否理解这份 JSON；新格式为 5 |
 | `minimumHostApiVersion` / `maximumHostApiVersion` | provider 契约的 API 大版本范围，当前为 1 |
-| `hostRequirements.minimumHostSdkVersion` | 插件所需的 Host SDK 最低版本；当前 Host 2.0.0，schema5特性在1.2.0引入 |
+| `hostRequirements.minimumHostSdkVersion` | 插件所需的 Host SDK 最低版本；当前开发 Host 2.15.0，schema5特性在1.2.0引入 |
 | `version` | 插件包自身版本，与播放器和Host版本独立 |
 
 不要用播放器 0.16.8 或 DLL 固定 AssemblyVersion 填写最低 Host SDK。接口程序集为兼容旧包保留身份，
@@ -113,6 +131,11 @@ schema 4/5 必须提供 hostRequirements；最低 SDK 是规范的三段数字�
 | 特性 | 何时必须声明 |
 | --- | --- |
 | `settings.v1` | 任一 provider 声明 settings |
+| `settings.v2` | 声明设置分组、本地化或条件；同时要求 v1 |
+| `declarative-pages.v1` 至 `declarative-pages.v9` | 声明 Pages 及入口 documentVersion；须包含从 v1 到所声明版本的全部特性 |
+| `global-pages.v1` | 声明 GlobalPages |
+| `creator-profile.v1` / `creator-feed.v1` / `creator-search.v1` | 分别声明 CreatorProfile / CreatorFeed / CreatorSearch |
+| `comment-replies.v1` | 声明 CommentReplies |
 | `credential-aliases.v1` | 清单声明非空 credentialAliases |
 | `native-login.v1` | 声明 NativeLogin |
 | `track-details.v1` | 声明 TrackDetails |

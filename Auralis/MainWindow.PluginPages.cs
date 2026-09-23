@@ -18,10 +18,22 @@ public partial class MainWindow
             requestId is <= 0 or > 9007199254740991L) return;
         Dictionary<string, string>? inputs = null;
         var invalidInputs = false;
+        int? pageSize = null;
+        var forceRefresh = false;
+        if (root.TryGetProperty("forceRefresh", out var refresh))
+        {
+            if (refresh.ValueKind != JsonValueKind.True && refresh.ValueKind != JsonValueKind.False) invalidInputs = true;
+            else forceRefresh = refresh.GetBoolean();
+        }
+        if (root.TryGetProperty("preferredPageSize", out var size))
+        {
+            if (size.ValueKind != JsonValueKind.Number || !size.TryGetInt32(out var count) || count is < 6 or > 20) invalidInputs = true;
+            else pageSize = count;
+        }
         if (root.TryGetProperty("inputValues", out var submitted))
         {
             inputs = new(StringComparer.Ordinal);
-            invalidInputs = submitted.ValueKind != JsonValueKind.Object;
+            invalidInputs |= submitted.ValueKind != JsonValueKind.Object;
             if (!invalidInputs)
                 foreach (var field in submitted.EnumerateObject())
                 {
@@ -40,9 +52,9 @@ public partial class MainWindow
             if (!global) await RestoreSavedHandleAsync(handle!);
             var result = global
                 ? await OnlinePlatforms.ReadPluginGlobalPageAsync(providerId!, entryId!, navigationHandle,
-                    JsonText(root, "language") ?? "zh-CN", cancellation.Token, inputs)
+                    JsonText(root, "language") ?? "zh-CN", cancellation.Token, inputs, pageSize, forceRefresh)
                 : await OnlinePlatforms.ReadPluginPageAsync(handle!, entryId!, navigationHandle,
-                    JsonText(root, "language") ?? "zh-CN", cancellation.Token, inputs);
+                    JsonText(root, "language") ?? "zh-CN", cancellation.Token, inputs, pageSize, forceRefresh);
             cancellation.Token.ThrowIfCancellationRequested();
             if (result.IsSuccess) page = result.Value; else error = ToPlatformError(result.Error);
         }

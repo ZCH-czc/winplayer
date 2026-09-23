@@ -28,30 +28,63 @@ window.AuralisCreatorSearch = (() => {
       if(payload.error){error=payload.error.message||t('作者搜索暂不可用');}
       else {
         const seen=new Set(items.map(i=>i.handle));
-        for(const item of(payload.items||[]).slice(0,100))if(typeof item.handle==='string'&&!seen.has(item.handle)){items.push(item);seen.add(item.handle);}
+        for(const item of(payload.items||[]).slice(0,100))if(items.length<200&&typeof item.handle==='string'&&!seen.has(item.handle)){items.push(item);seen.add(item.handle);}
         next=payload.nextPageHandle!==previous?payload.nextPageHandle:null;
       }
       paint();
     }
     function paint(){
       const section=document.getElementById('creatorSearchSection');if(!section)return;
-      section.hidden=!allowed()||!query;if(section.hidden)return;
+      // A completed empty overview has no author shelf. Loading and failures remain actionable,
+      // and the Users category still explains an empty result rather than becoming a blank page.
+      const category=api.state.platformSearch.category||'all';
+      section.hidden=!allowed()||!query||category==='tracks'||
+        (category==='all'&&searched&&!pending&&!timer&&!error&&!items.length);if(section.hidden)return;
+      section.dataset.category=api.state.platformSearch.category||'all';
       const esc=api.escape;
-      section.innerHTML='<div class="section-title-row"><h2>'+t('UP 主 / 作者')+'</h2><span data-i18n-skip>'+esc(api.providerName(providerId))+'</span></div><div class="creator-search-grid" aria-busy="'+!!pending+'"></div><div class="creator-search-footer" role="status"></div>';
+      if(section.dataset.searchKey!==key||!section.querySelector('.creator-search-grid')){
+        section.dataset.searchKey=key;
+        section.innerHTML='<div class="section-title-row"><h2>'+t('UP 主 / 作者')+'</h2><span data-i18n-skip>'+esc(api.providerName(providerId))+'</span></div><div class="creator-search-grid"></div><div class="creator-search-footer" role="status"></div>';
+      }
       const grid=section.querySelector('.creator-search-grid');
-      for(const item of items){
+      grid.setAttribute('aria-busy',String(!!pending||!!timer));
+      const added=[];
+      for(const item of items.slice(grid.children.length)){
         const button=document.createElement('button');button.className='creator-search-card';button.dataset.creatorResult=item.handle;
         const url=window.AuralisCreatorFeed.art(item.avatarUrl);
-        button.innerHTML='<span class="comment-avatar">'+(url?'<img src="'+esc(url)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':esc(Array.from(item.displayName||'?')[0]))+'</span><span><strong data-i18n-skip>'+esc(item.displayName)+'</strong><small data-i18n-skip>'+esc(item.description)+'</small></span>';
-        button.querySelector('img')?.addEventListener('error',e=>e.target.remove(),{once:true});
-        button.addEventListener('click',()=>open({...item,kind:'online',providerId,title:item.displayName,artist:item.displayName}));grid.append(button);
+        button.innerHTML='<span class="comment-avatar"><span>'+esc(Array.from(item.displayName||'?')[0])+'</span>'+(url?'<img src="'+esc(url)+'" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">':'')+'</span><span><strong data-i18n-skip>'+esc(item.displayName)+'</strong><small data-i18n-skip>'+esc(item.description)+'</small></span>';
+        const avatar=button.querySelector('.comment-avatar');let failed=false,retries=0;
+        function retryAvatar(){
+          if(!failed||!url)return;failed=false;retries++;avatar.querySelector('.creator-search-retry')?.remove();
+          button.removeAttribute('aria-keyshortcuts');button.removeAttribute('title');
+          const image=document.createElement('img');image.alt='';image.loading='lazy';image.decoding='async';image.referrerPolicy='no-referrer';
+          image.addEventListener('error',()=>{
+            image.remove();failed=true;button.setAttribute('aria-keyshortcuts','R');button.title=t('头像加载失败，点击头像或按 R 重试');
+            const mark=document.createElement('span');mark.className='creator-search-retry';mark.textContent='↻';mark.setAttribute('aria-hidden','true');avatar.append(mark);
+          },{once:true});
+          image.src=window.AuralisLoading.retryImageUrl(url,retries);window.AuralisLoading.image(image);avatar.append(image);
+        }
+        const initial=avatar.querySelector('img');if(initial){
+          initial.addEventListener('error',()=>{
+            initial.remove();failed=true;button.setAttribute('aria-keyshortcuts','R');button.title=t('头像加载失败，点击头像或按 R 重试');
+            const mark=document.createElement('span');mark.className='creator-search-retry';mark.textContent='↻';mark.setAttribute('aria-hidden','true');avatar.append(mark);
+          },{once:true});window.AuralisLoading.image(initial);
+        }
+        button.addEventListener('click',event=>{if(failed&&avatar.contains(event.target)){event.stopImmediatePropagation();retryAvatar();}},true);
+        button.addEventListener('keydown',event=>{if(failed&&event.key.toLowerCase()==='r'){event.preventDefault();event.stopPropagation();retryAvatar();}});
+        button.addEventListener('click',()=>open({...item,kind:'online',providerId,title:item.displayName,artist:item.displayName}));grid.append(button);added.push(button);
       }
       const footer=section.querySelector('.creator-search-footer');
-      if(pending||timer)footer.textContent=t('正在读取…');
-      else if(error){const message=document.createElement('p');message.textContent=error;footer.append(message);addButton(t('重试'),()=>send(next));}
-      else if(next)addButton(t('加载更多'),()=>send(next));
-      else footer.textContent=t(items.length?'已加载当前可见的作者':'没有匹配的作者');
-      function addButton(label,action){const b=document.createElement('button');b.className='secondary-button';b.textContent=label;b.addEventListener('click',action);footer.append(b);}
+      window.AuralisPageMotion?.reveal(added,api.reduced());
+      let text='',label='',action=null;
+      if(pending||timer)text=t('正在读取…');
+      else if(error){text=error;label=t('重试');action=()=>send(next);}
+      else if(section.dataset.category==='all'&&items.length>3){label=t('查看全部用户');action=()=>document.querySelector('[data-action="search-result-category"][data-category="users"]')?.click();}
+      else if(items.length>=200)text=t('已达到页面显示上限，请重新打开页面。');
+      else if(next){label=t('加载更多');action=()=>send(next);}
+      else text=t(items.length?'已加载当前可见的作者':'没有匹配的作者');
+      window.AuralisLoading.continuation(footer,{pending:!!pending||!!timer,initial:!items.length,text,label,action,
+        kind:error?'retry':section.dataset.category==='all'&&items.length>3?'browse':'more',reduced:api.reduced()});
     }
     function mount(){
       if(!active())return;

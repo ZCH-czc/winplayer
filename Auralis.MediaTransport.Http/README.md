@@ -19,7 +19,8 @@ does not download or create the cache directory. No personal account store is re
 
 Preserved limits: complete foreground response <=512 MiB, speculative buffering <=64 MiB, session cache
 8 entries/768 MiB soft eviction target (all pinned entries protected), <=5 validated redirect hops, HTTPS or loopback HTTP.
-When every remaining entry is pinned this target can be exceeded; this is not an aggregate memory/disk quota.
+When every remaining entry is pinned or cannot be deleted because of an external lock this target can be
+exceeded; this is not an aggregate memory/disk quota.
 Each successful preparation increments its own pin under the cache gate. Releasing one cache-hit handle
 does not release other callers' pins. Last release allows eviction, but does not eagerly delete reusable cache.
 
@@ -40,6 +41,20 @@ Lifecycle improvement: every operation enters a shutdown scope. Dispose cancels/
 disposing HTTP/semaphore and removing owned cache files. Failure/cancellation after the final rename also
 removes the uncommitted file. Expiry is checked at entry, cached return and after buffering; raw query/header
 values never become filenames. Repeated disposal awaits the same completion task.
+
+2026-09-21: eviction now retains cache ownership when `File.Delete` fails, instead of dropping the
+entry before attempting deletion. Each trim visits each unpinned candidate at most once; it can skip
+a locked candidate without spinning or deleting pinned sources. A later trim or final session disposal
+retries the retained file. There is no delay, background polling or network retry. External locks still
+held through shutdown, failed uncommitted-file deletion and external temporary aliases remain outside
+this guarantee and may need later stale maintenance; deletion failure is not an OS deletion schedule.
+
+`dotnet run --project Auralis.MediaTransport.Tests -c Release -- --cleanup-only` runs 20 controlled
+Windows file-lock lifecycles / 100 assertions. The new regression fails on the pre-fix implementation:
+after releasing a blocked eviction's external lock, a later trim forgets to delete the owned source.
+It also checks final shutdown, independent live pins and repeated disposal, with no sleeps or polling.
+The fixture runs in the full transport suite too. This independently reproducible bug is not proof
+that the previously observed transient uppercase `.MP3.tmp` directory entry had the same cause.
 
 0.4.0 coalesces identical in-flight preparations within one session. Matching is deliberately stricter
 than completed-cache reuse: authorized full URI, request headers, expiry, MIME/variant, cache identity,

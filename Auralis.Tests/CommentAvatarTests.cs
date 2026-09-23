@@ -39,5 +39,17 @@ internal static class CommentAvatarTests
         Check(registry.Register("first", original, policy, () => active) is null);
         Check(registry.Register("bad", original, policy, () => throw new Exception("private")) is null);
         Check(registry.Register("none", original, PlatformCommentArtworkPolicy.DenyAll, static () => true) is null);
+        var reading = new CommentAvatarRegistry(() => now, 8);
+        var readingActive = true;
+        var avatar = reading.Register("fixture", original, policy, () => readingActive)!;
+        var image = reading.Register("fixture", original, policy, () => readingActive, fullImage: true)!;
+        Check(image.StartsWith("https://platform-art.auralis.local/image-") && image != avatar);
+        Check(reading.Register("fixture", original, policy, () => readingActive, fullImage: true) == image);
+        var imageHandle = new Uri(image).AbsolutePath.TrimStart('/');
+        Check(reading.TryResolve(imageHandle, out var imageUri, out var imageGrant) && imageUri == original);
+        Check(!reading.TryResolve(new Uri(avatar).AbsolutePath.TrimStart('/').Replace("avatar-", "image-"), out _, out _));
+        Check(!imageGrant!(new Uri("https://foreign.example.test/image")));
+        readingActive = false;
+        Check(!imageGrant(original) && !reading.TryResolve(imageHandle, out _, out _));
     }
 }

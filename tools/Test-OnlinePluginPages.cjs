@@ -25,6 +25,12 @@ async function checkBrandAndSearchLoading(page, messages, theme, scale) {
   await page.locator('.settings-home-about').scrollIntoViewIfNeeded();
   await fs.mkdir('artifacts/brand-search-ui',{recursive:true});
   await page.screenshot({path:`artifacts/brand-search-ui/brand-${theme}-${scale}.png`});
+  await page.locator('[data-settings-section="library"]').click();
+  const priority=page.locator('[data-setting="searchResultPriority"]');
+  await priority.locator('[data-value="local"]').click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('auralis:search-result-priority')),'local');
+  await priority.locator('[data-value="plugin"]').click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('auralis:search-result-priority')),'plugin');
   await page.evaluate(()=>window.Auralis.setPlatformConfiguration({providers:[{id:'fixture.search.loading',name:'Slow search',capabilities:['TrackSearch'],configured:true}]}));
   await page.locator('#sidebarSearchButton').click();
   const immediate=await page.evaluate(()=>{
@@ -33,6 +39,7 @@ async function checkBrandAndSearchLoading(page, messages, theme, scale) {
   });
   assert.match(immediate,/正在搜索/);assert.doesNotMatch(immediate,/没有匹配歌曲/);
   await page.waitForFunction(()=>document.querySelector('.platform-search-section .is-loading'));
+  assert(await page.locator('.search-view > .search-section').first().evaluate(n=>n.classList.contains('platform-search-section')),'plugin priority changes DOM reading order');
   await page.waitForTimeout(350);
   const request=messages.findLast(m=>m.action==='platformSearchTracks'&&m.providerId==='fixture.search.loading');assert(request);
   await page.screenshot({path:`artifacts/brand-search-ui/loading-${theme}-${scale}.png`});
@@ -112,14 +119,23 @@ const server=http.createServer(async(req,res)=>{try{
   assert.equal(await page.locator('[data-online-provider]').count(),0,'core-only has no built-in accounts');
   assert.equal(await page.locator('[data-online-provider-filter]').count(),0);
   await checkLyricsCapabilityUi(page,messages);
-  const fixture={id:'fixture.new',name:'New Plugin <safe>',capabilities:['TrackSearch','PlaylistBrowse','PlaylistDetails','Authentication','NativeLogin','VideoResolution'],authentication:{status:'signedin',accountDisplayName:'Fixture user'},playlists:[{handle:'fixture-list',title:'Fixture collection',trackCount:1}]};
+  const fixture={id:'fixture.new',name:'New Plugin <safe>',capabilities:['TrackSearch','PlaylistBrowse','PlaylistDetails','Authentication','NativeLogin','VideoResolution','CreatorFeed'],authentication:{status:'signedin',accountDisplayName:'Fixture user'},playlists:[{handle:'fixture-list',title:'Fixture collection',trackCount:1}]};
   await config([fixture]);assert.equal(await page.locator('[data-online-provider]').count(),1);
   assert.equal(await page.locator('[data-online-provider-filter]').count(),2);
   assert.equal(await page.locator('.online-account-copy strong img').count(),0);
   await page.locator('[data-online-playlist-handle="fixture-list"]').click();await page.waitForTimeout(200);
   const request=messages.findLast(m=>m.action==='requestOnlineCollection');assert.equal(request.providerId,'fixture.new');
-  await page.evaluate(r=>window.Auralis.setOnlineCollection({...r,detail:{playlist:{handle:r.handle,title:'Fixture details'},tracks:[{handle:'fixture-track',title:'Fixture song',providerId:r.providerId,durationSeconds:120}]}}),request);
+  const longTitle='Fixture song with a deliberately extended complete video title that cannot fit in the title column at any tested DPI';
+  await page.evaluate(({r,longTitle})=>window.Auralis.setOnlineCollection({...r,detail:{playlist:{handle:r.handle,title:'Fixture details'},tracks:[{handle:'fixture-track',title:longTitle,providerId:r.providerId,artist:'Primary、Collaborator',artistNames:['Primary','Collaborator'],viewCount:76543,durationSeconds:120}]}}),{r:request,longTitle});
   await page.getByRole('heading',{name:'Fixture details'}).waitFor();
+  assert.equal(await page.locator('.platform-track-grid.track-list-header > :nth-child(6)').innerText(),'播放量');
+  assert.equal(await page.locator('.platform-view-count').getAttribute('aria-label'),'播放量 76543');
+  assert.equal(await page.locator('.creator-link').count(),1,'only the primary uploader inherits the track creator action');
+  assert.equal(await page.locator('.creator-coauthor').innerText(),'Collaborator');
+  if(scale!==2)await page.locator('.creator-link').hover();
+  assert.equal(await page.locator('.creator-link').evaluate(n=>getComputedStyle(n).backgroundColor),'rgba(0, 0, 0, 0)');
+  await page.locator('.platform-full-title').hover();
+  assert.equal(await page.locator('.platform-title-bubble.is-visible').innerText(),longTitle);
   assert.equal(await page.locator('[data-media-action="track-comments"]').count(),0,'collection rows do not invent an undeclared comment capability');
   await page.locator('[data-platform-play-row="fixture-track"]').hover();
   await page.locator('[data-platform-play-handle="fixture-track"]').click();await page.waitForTimeout(80);

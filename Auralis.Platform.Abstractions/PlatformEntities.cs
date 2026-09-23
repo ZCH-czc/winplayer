@@ -67,6 +67,9 @@ public sealed record PlatformTrack
 
     /// <summary>Gets the provider music video associated with this track, when one is available.</summary>
     public PlatformMusicVideoReference? MusicVideo { get; init; }
+
+    /// <summary>Optional nonnegative public play count; never a playback or access entitlement.</summary>
+    public long? ViewCount { get; init; }
 }
 
 /// <summary>Represents an online album.</summary>

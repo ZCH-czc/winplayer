@@ -41,7 +41,7 @@ internal static class PluginUpdateReviewTests
         var update = await manager.PrepareBatchAsync([second]);
         var review = update.Items.Single().Preview!.Review!;
         Check(review is {Kind:"update",PreviousVersion:"1.0.0",PreviousVerified:true,AccessReviewRequired:true},"Actual previous metadata and trust projected");
-        Check(review.PreviousPayloadSha256?.Length==64 && review.HostSdkVersion=="2.10.0","Bound checksum and actual SDK");
+        Check(review.PreviousPayloadSha256?.Length==64 && review.HostSdkVersion==PlatformHostCompatibility.SdkVersion,"Bound checksum and actual SDK");
         foreach(var kind in new[]{"capabilities","pages","settings","credentials","settingAliases","artworkDomains"})
             Check(review.Changes.Any(c=>c.Kind==kind && c.Added.Count>0),kind+" actual delta");
         var serialized=JsonSerializer.Serialize(review);
